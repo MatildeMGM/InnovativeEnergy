@@ -74,19 +74,75 @@ def _energy_wh_from_power(power_w: pd.Series) -> float:
     dt_h = pd.Series(power_w.index).diff().dt.total_seconds().div(3600).fillna(0).to_numpy()
     return float((power_w.to_numpy() * dt_h).sum())
 
+
+def _energy_wh_series_from_power(power_w: pd.Series) -> pd.Series:
+    dt_h = power_w.index.to_series().diff().dt.total_seconds().div(3600.0)
+    dt_h.iloc[0] = 0.0
+    return power_w * dt_h
+
+
+def _get_pvgis_tmy_irradiance(lat: float, lon: float) -> pd.DataFrame:
+    tmy, meta = pvlib.iotools.get_pvgis_tmy(lat, lon, map_variables=True)
+
+    if tmy.index.tz is None:
+        tmy.index = tmy.index.tz_localize("UTC")
+
+    tmy = tmy.tz_convert(TZ)
+
+    return tmy[["ghi", "dni", "dhi"]].astype(float)
+
+
+def _pv_timeseries_from_irradiance(
+    lat, lon, area_m2, eff, tilt_deg, azimuth_deg, times, ghi, dni, dhi
+):
+    location = pvlib.location.Location(lat, lon, tz=TZ, altitude=ALTITUDE_M)
+    solpos = location.get_solarposition(times)
+    dni_extra = pvlib.irradiance.get_extra_radiation(times)
+
+    poa = pvlib.irradiance.get_total_irradiance(
+        surface_tilt=tilt_deg,
+        surface_azimuth=azimuth_deg,
+        solar_zenith=solpos["zenith"],
+        solar_azimuth=solpos["azimuth"],
+        dni=dni,
+        ghi=ghi,
+        dhi=dhi,
+        dni_extra=dni_extra,
+        model="perez",
+    )
+
+    power_w = poa["poa_global"].clip(lower=0) * area_m2 * eff
+
+    return pd.DataFrame(
+        {"poa_global": poa["poa_global"], "power_w": power_w},
+        index=times,
+    )
+
 def daily_profile(lat, lon, area_m2, eff, tilt_deg, azimuth_deg, day_date, freq):
     start_ts = pd.Timestamp(day_date).tz_localize(TZ)
     end_ts = (pd.Timestamp(day_date) + pd.Timedelta(days=1)).tz_localize(TZ)
     return _pv_timeseries(lat, lon, area_m2, eff, tilt_deg, azimuth_deg, start_ts, end_ts, freq)
 
 def yearly_daily_energy(lat, lon, area_m2, eff, tilt_deg, azimuth_deg, year: int):
-    start_ts = pd.Timestamp(f"{year}-01-01").tz_localize(TZ)
-    end_ts = pd.Timestamp(f"{year+1}-01-01").tz_localize(TZ)
+    # use realistic meteorology instead of clear-sky
+    tmy = _get_pvgis_tmy_irradiance(lat, lon)
 
-    df = _pv_timeseries(lat, lon, area_m2, eff, tilt_deg, azimuth_deg, start_ts, end_ts, freq="1h")
-    daily_wh = df["power_w"].resample("1D").sum()  # hourly -> Wh/day
+    # stamp TMY onto requested year (for plotting consistency)
+    times = tmy.index.map(lambda ts: ts.replace(year=year))
+    times = pd.DatetimeIndex(times).tz_convert(TZ)
+
+    df = _pv_timeseries_from_irradiance(
+        lat, lon, area_m2, eff, tilt_deg, azimuth_deg,
+        times=times,
+        ghi=tmy["ghi"].to_numpy(),
+        dni=tmy["dni"].to_numpy(),
+        dhi=tmy["dhi"].to_numpy(),
+    )
+
+    e_wh = _energy_wh_series_from_power(df["power_w"])
+    daily_wh = e_wh.resample("1D").sum()
+
     return daily_wh
-
 
 # ----------------------------
 # GeoJSON sanitation (ipyleaflet requires JSON-serializable properties)

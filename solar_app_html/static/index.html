@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>PV Map (Local)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #wrap { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
+    #side { padding: 12px; border-right: 1px solid #ddd; overflow: auto; }
+    #map { height: 100vh; cursor: crosshair; }
+
+    .row { margin-bottom: 10px; }
+    label { display: block; font-size: 12px; color: #444; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+    button { padding: 10px; width: 100%; margin-bottom: 8px; }
+    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; }
+
+    .small { font-size: 12px; color: #555; }
+    .hr { height: 1px; background: #ddd; margin: 10px 0; }
+  </style>
+</head>
+
+<body>
+<div id="wrap">
+  <div id="side">
+    <h3>PV estimator</h3>
+
+    <div class="row">
+      <label>Preset</label>
+      <select id="preset"></select>
+    </div>
+
+    <div class="row">
+      <label>Area (m²)</label>
+      <input id="area" type="number" step="0.5" value="10">
+    </div>
+
+    <div class="row">
+      <label>Efficiency</label>
+      <input id="eff" type="number" step="0.005" value="0.20">
+    </div>
+
+    <div class="row">
+      <label>Tilt (°)</label>
+      <input id="tilt" type="number" step="1" value="40">
+    </div>
+
+    <div class="row">
+      <label>Azimuth (°)</label>
+      <input id="az" type="number" step="1" value="180">
+    </div>
+
+    <div class="row">
+      <label>Day</label>
+      <input id="day" type="date">
+    </div>
+
+    <div class="row">
+      <label>24h resolution</label>
+      <select id="freq">
+        <option value="1h">Hourly</option>
+        <option value="15min">15 min</option>
+        <option value="5min">5 min</option>
+      </select>
+    </div>
+
+    <button id="btnSummary">Refresh summary</button>
+    <button id="btnPlots">Show plots</button>
+
+    <div class="hr"></div>
+
+    <div class="small"><b>Status:</b> <span id="status">Click map to set location. Use Refresh summary / Show plots afterwards.</span></div>
+    <div class="small"><b>Selected:</b> <span id="coord">—</span></div>
+
+    <pre id="out">No summary yet.</pre>
+
+    <canvas id="chartDay" height="140"></canvas>
+    <canvas id="chartYear" height="140"></canvas>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script>
+  const out = document.getElementById("out");
+  const coord = document.getElementById("coord");
+  const statusEl = document.getElementById("status");
+
+  const presetEl = document.getElementById("preset");
+  const areaEl = document.getElementById("area");
+  const effEl = document.getElementById("eff");
+  const tiltEl = document.getElementById("tilt");
+  const azEl = document.getElementById("az");
+  const dayEl = document.getElementById("day");
+  const freqEl = document.getElementById("freq");
+
+  let PRESETS = {};
+  let selected = null;
+  let marker = null;
+
+  let chartDay = null;
+  let chartYear = null;
+  let lastSummary = null;
+
+  async function getJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(await r.text());
+    return await r.json();
+  }
+
+  function setSelected(lat, lon) {
+    selected = {lat, lon};
+    coord.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    statusEl.textContent = "Location set. Use Refresh summary / Show plots afterwards.";
+
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+    }
+  }
+
+  function applyPreset(name) {
+    const [area, eff] = PRESETS[name];
+
+    if (name !== "Custom") {
+      areaEl.value = area;
+      effEl.value = eff;
+      areaEl.disabled = true;
+      effEl.disabled = true;
+    } else {
+      areaEl.disabled = false;
+      effEl.disabled = false;
+    }
+  }
+
+  function renderSummary(data) {
+    const s = data.inputs;
+    const lines = [];
+
+    lines.push(`Location: ${data.location.lat.toFixed(5)}, ${data.location.lon.toFixed(5)}`);
+    lines.push(`Settings: area=${Number(s.area_m2).toFixed(1)} m², eff=${Number(s.eff).toFixed(3)}, tilt=${Number(s.tilt).toFixed(0)}°, az=${Number(s.az).toFixed(0)}°`);
+    lines.push(`Selected day: ${s.day} (24h step=${s.freq})`);
+    lines.push(`Peak POA: ${Math.round(data.peak_poa_wm2)} W/m²`);
+    lines.push(`Peak PV power: ${Math.round(data.peak_power_w)} W`);
+    lines.push(`Energy for selected day (clear-sky): ${data.energy_day_kwh_clear_sky.toFixed(2)} kWh`);
+    lines.push(`Year ${data.year} total (TMY/PVGIS): ${Math.round(data.energy_year_kwh_tmy)} kWh`);
+
+    lines.push("");
+    lines.push("Plan at clicked location:");
+    if (!data.plan) {
+      lines.push("  None (clicked point is not inside any plan polygon).");
+    } else {
+      for (const [k, v] of Object.entries(data.plan)) {
+        lines.push(`  ${k}: ${v}`);
+      }
+    }
+
+    out.textContent = lines.join("\n");
+  }
+
+  function renderPlots(data) {
+    const day = data.series_day;
+    const year = data.series_year;
+
+    if (chartDay) chartDay.destroy();
+    if (chartYear) chartYear.destroy();
+
+    chartDay = new Chart(document.getElementById("chartDay"), {
+      type: "line",
+      data: {
+        labels: day.t,
+        datasets: [{ label: "Power (W)", data: day.power_w, pointRadius: 0 }]
+      },
+      options: { responsive: true, scales: { x: { display: false } } }
+    });
+
+    chartYear = new Chart(document.getElementById("chartYear"), {
+      type: "line",
+      data: {
+        labels: year.d,
+        datasets: [{ label: "Daily energy (kWh/day)", data: year.kwh, pointRadius: 0 }]
+      },
+      options: { responsive: true, scales: { x: { display: false } } }
+    });
+  }
+
+  async function init() {
+    // Default date = today
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    dayEl.value = `${yyyy}-${mm}-${dd}`;
+
+    const presetsResp = await getJSON("/api/presets");
+    PRESETS = presetsResp.presets;
+
+    presetEl.innerHTML = "";
+    for (const name of Object.keys(PRESETS)) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      presetEl.appendChild(opt);
+    }
+    presetEl.value = "Standard (20%, 10 m²)";
+    applyPreset(presetEl.value);
+
+    presetEl.addEventListener("change", () => applyPreset(presetEl.value));
+
+    const center = await getJSON("/api/center");
+
+    // Map
+    const map = L.map("map").setView([center.lat, center.lon], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    // Marker visible immediately (like original)
+    marker = L.marker([center.lat, center.lon]).addTo(map);
+    setSelected(center.lat, center.lon);
+
+    // Bornholm layer
+    const bornholm = await getJSON("/api/bornholm");
+    const bornholmLayer = L.geoJSON(bornholm, {
+      style: { weight: 2, fillOpacity: 0.05 },
+      onEachFeature: (feature, layer) => {
+        layer.on("click", (e) => {
+          setSelected(e.latlng.lat, e.latlng.lng);
+        });
+      }
+    });
+
+    // Planer layer (full, like original)
+    const planer = await getJSON("/api/planer");
+    const planerLayer = L.geoJSON(planer, {
+      style: { weight: 1, fillOpacity: 0.10 },
+      onEachFeature: (feature, layer) => {
+        // IMPORTANT: clicking polygons should still select location
+        layer.on("click", (e) => {
+          setSelected(e.latlng.lat, e.latlng.lng);
+        });
+      }
+    });
+
+    bornholmLayer.addTo(map);
+    planerLayer.addTo(map);
+
+    // Layer control like original
+    L.control.layers(
+      { "OpenStreetMap": L.tileLayer },
+      { "Bornholm": bornholmLayer, "Lokal Planer": planerLayer },
+      { collapsed: false }
+    );
+
+    // Map click (works everywhere not caught by polygons)
+    map.on("click", (e) => {
+      setSelected(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Buttons
+    document.getElementById("btnSummary").onclick = async () => {
+      if (!selected) {
+        statusEl.textContent = "Click map to set location first.";
+        return;
+      }
+
+      statusEl.textContent = "Computing summary…";
+
+      const params = new URLSearchParams({
+        lat: selected.lat,
+        lon: selected.lon,
+        area_m2: areaEl.value,
+        eff: effEl.value,
+        tilt: tiltEl.value,
+        az: azEl.value,
+        day: dayEl.value,
+        freq: freqEl.value,
+      });
+
+      const data = await getJSON(`/api/summary?${params.toString()}`);
+      lastSummary = data;
+      renderSummary(data);
+      statusEl.textContent = "Summary updated.";
+    };
+
+    document.getElementById("btnPlots").onclick = () => {
+      if (!lastSummary) {
+        statusEl.textContent = "Refresh summary first (so plot data exists).";
+        return;
+      }
+      renderPlots(lastSummary);
+      statusEl.textContent = "Plots updated.";
+    };
+  }
+
+  init().catch(err => {
+    out.textContent = "Init error:\n" + err;
+    statusEl.textContent = "Error during initialization. See details in output box.";
+    console.error(err);
+  });
+</script>
+</body>
+</html>

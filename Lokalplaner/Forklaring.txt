@@ -1,0 +1,6 @@
+
+Lokalplaner_udvalgte.py -> sorteret (MAIN til brug)
+
+Lokalplaner_analyse.py -> databehandling
+
+planer.csv -> originalfil

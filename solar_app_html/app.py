@@ -175,7 +175,7 @@ def _pick_summary_fields(planer_cols):
         "planid", "plan_id", "lokalplan", "lokalplan_nr", "nummer",
         "plantype", "type", "status",
         "vedtaget", "vedtagelsesdato", "dato", "startdato", "slutdato",
-        "link", "url"
+        "link", "url", "doklink"
     ]
     chosen = [c for c in preferred if c in planer_cols and c != "geometry"]
     if not chosen:

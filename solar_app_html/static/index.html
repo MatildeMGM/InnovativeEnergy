@@ -9,6 +9,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <style>
     body { margin: 0; font-family: sans-serif; }
@@ -20,10 +22,156 @@
     label { display: block; font-size: 12px; color: #444; margin-bottom: 4px; }
     input, select { width: 100%; padding: 6px; box-sizing: border-box; }
     button { padding: 10px; width: 100%; margin-bottom: 8px; }
-    pre { background: #f7f7f7; padding: 10px; white-space: pre-wrap; }
+    pre { background: #dddddd; padding: 10px; white-space: pre-wrap; }
 
     .small { font-size: 12px; color: #555; }
-    .hr { height: 1px; background: #ddd; margin: 10px 0; }
+    .hr { height: 1px; background: #dddddd; margin: 10px 0; }
+    #plans { font-size: 13px; }
+    .planItem {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin: 8px 0;
+      background: #fff;
+      overflow: hidden;
+    }
+    .planItem summary {
+      cursor: pointer;
+      padding: 10px;
+      background: #f7f7f7;
+      font-weight: 600;
+      outline: none;
+    }
+    .planBody {
+      padding: 10px;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 6px 10px;
+    }
+    .kv .k { color: #555; font-size: 12px; }
+    .kv .v { color: #111; word-break: break-word; }
+    .kv a { color: #0b57d0; text-decoration: none; }
+    .kv a:hover { text-decoration: underline; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eee;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    #summary { font-size: 13px; }
+
+    .section {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      margin: 8px 0;
+      overflow: visible;
+      background: #fff;
+    }
+
+    .section summary {
+      cursor: pointer;
+      padding: 10px;
+      background: #f7f7f7;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section .body { padding: 10px; }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 6px 10px;
+      align-items: start;
+    }
+    .row2 .k { color: #555; font-size: 12px; }
+    .row2 .v { color: #111; word-break: break-word; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eee;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    /* Tooltip */
+    .qm {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid #bbb;
+      font-size: 11px;
+      color: #555;
+      margin-left: 6px;
+      cursor: help;
+      position: relative;
+      user-select: none;
+    }
+
+    .qm::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: 0px;
+      top: 22px;
+      min-width: 220px;
+      max-width: 320px;
+      white-space: normal;
+      background: #111;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.3;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 9999;
+    }
+
+    .qm:hover::after {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Geocoder search box styling */
+    .leaflet-control-geocoder {
+      width: 260px !important;
+    }
+
+    .leaflet-control-geocoder input {
+      width: 100% !important;
+      height: 36px;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+
+    /* softer placeholder look */
+    .leaflet-control-geocoder input::placeholder {
+      color: #666;
+      opacity: 0.6;
+    }
+
+    .leaflet-control-geocoder-icon {
+      display: none;
+    }
+
+
+
+
   </style>
 </head>
 
@@ -38,13 +186,13 @@
     </div>
 
     <div class="row">
-      <label>Area (m²)</label>
-      <input id="area" type="number" step="0.5" value="10">
+      <label>PV size (kWp)</label>
+      <input id="kwp" type="number" step="0.1" value="1.0" min="0">
     </div>
 
     <div class="row">
-      <label>Efficiency</label>
-      <input id="eff" type="number" step="0.005" value="0.20">
+      <label>Performance ratio PR (optional)</label>
+      <input id="pr" type="number" step="0.01" value="1.00" min="0" max="1.2">
     </div>
 
     <div class="row">
@@ -79,7 +227,11 @@
     <div class="small"><b>Status:</b> <span id="status">Click map to set location. Use Refresh summary / Show plots afterwards.</span></div>
     <div class="small"><b>Selected:</b> <span id="coord">—</span></div>
 
-    <pre id="out">No summary yet.</pre>
+    <div id="summary">No summary yet.</div>
+
+    <div class="hr"></div>
+    <h4 style="margin: 8px 0;">Plans</h4>
+    <div id="plans">No plans yet.</div>
 
     <canvas id="chartDay" height="140"></canvas>
     <canvas id="chartYear" height="140"></canvas>
@@ -89,13 +241,14 @@
 </div>
 
 <script>
-  const out = document.getElementById("out");
+  const summaryEl = document.getElementById("summary");
+  const plansEl = document.getElementById("plans");
   const coord = document.getElementById("coord");
   const statusEl = document.getElementById("status");
 
   const presetEl = document.getElementById("preset");
-  const areaEl = document.getElementById("area");
-  const effEl = document.getElementById("eff");
+  const kwpEl = document.getElementById("kwp");
+  const prEl = document.getElementById("pr");
   const tiltEl = document.getElementById("tilt");
   const azEl = document.getElementById("az");
   const dayEl = document.getElementById("day");
@@ -126,43 +279,91 @@
   }
 
   function applyPreset(name) {
-    const [area, eff] = PRESETS[name];
+    const kwp = PRESETS[name];
 
     if (name !== "Custom") {
-      areaEl.value = area;
-      effEl.value = eff;
-      areaEl.disabled = true;
-      effEl.disabled = true;
+      kwpEl.value = kwp;
+      kwpEl.disabled = true;
     } else {
-      areaEl.disabled = false;
-      effEl.disabled = false;
+      kwpEl.disabled = false;
     }
+  }
+
+  function tip(text) {
+    return `<span class="qm" data-tip="${escapeAttr(text)}">?</span>`;
   }
 
   function renderSummary(data) {
     const s = data.inputs;
-    const lines = [];
 
-    lines.push(`Location: ${data.location.lat.toFixed(5)}, ${data.location.lon.toFixed(5)}`);
-    lines.push(`Settings: area=${Number(s.area_m2).toFixed(1)} m², eff=${Number(s.eff).toFixed(3)}, tilt=${Number(s.tilt).toFixed(0)}°, az=${Number(s.az).toFixed(0)}°`);
-    lines.push(`Selected day: ${s.day} (24h step=${s.freq})`);
-    lines.push(`Peak POA: ${Math.round(data.peak_poa_wm2)} W/m²`);
-    lines.push(`Peak PV power: ${Math.round(data.peak_power_w)} W`);
-    lines.push(`Energy for selected day (clear-sky): ${data.energy_day_kwh_clear_sky.toFixed(2)} kWh`);
-    lines.push(`Year ${data.year} total (TMY/PVGIS): ${Math.round(data.energy_year_kwh_tmy)} kWh`);
+    const locationStr = `${data.location.lat.toFixed(5)}, ${data.location.lon.toFixed(5)}`;
+    const settingsStr = `kWp=${Number(s.kwp).toFixed(2)}, PR=${Number(s.pr).toFixed(2)}, tilt=${Number(s.tilt).toFixed(0)}°, az=${Number(s.az).toFixed(0)}°`;
 
-    lines.push("");
-    lines.push("Plan at clicked location:");
-    if (!data.plan) {
-      lines.push("  None (clicked point is not inside any plan polygon).");
-    } else {
-      for (const [k, v] of Object.entries(data.plan)) {
-        lines.push(`  ${k}: ${v}`);
-      }
-    }
+    const peakPoa = Math.round(data.peak_poa_wm2);
+    const peakPower = Math.round(data.peak_power_w);
 
-    out.textContent = lines.join("\n");
+    const dayKwh = data.energy_day_kwh_clear_sky.toFixed(2);
+    const yearKwh = Math.round(data.energy_year_kwh_tmy);
+
+    const html = `
+      <details class="section" open>
+        <summary>
+          Overview
+          <span class="badge">${locationStr}</span>
+        </summary>
+        <div class="body">
+          <div class="row2">
+            <div class="k">Location ${tip("Latitude/longitude of the clicked point on the map.")}</div>
+            <div class="v">${escapeHtml(locationStr)}</div>
+
+            <div class="k">Settings ${tip("kWp is the PV system rated power at STC. PR is a loss factor (1.00 = no losses). Tilt/azimuth define panel orientation.")}</div>
+            <div class="v">${escapeHtml(settingsStr)}</div>
+
+            <div class="k">Selected day ${tip("Day used for the clear-sky 24h curve. This is not measured weather; it is a theoretical clear-sky model.")}</div>
+            <div class="v">${escapeHtml(s.day)} (step=${escapeHtml(s.freq)})</div>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" open>
+        <summary>
+          Peak values (selected day)
+          <span class="badge">${peakPower} W</span>
+        </summary>
+        <div class="body">
+          <div class="row2">
+            <div class="k">Peak POA ${tip("Plane-of-array irradiance (W/m²) on the tilted panel surface.")}</div>
+            <div class="v">${peakPoa} W/m²</div>
+
+            <div class="k">Peak PV power ${tip("Estimated DC power output at that moment: P ≈ kWp × POA (W/m²) × PR.")}</div>
+            <div class="v">${peakPower} W</div>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" open>
+        <summary>
+          Energy results
+          <span class="badge">${yearKwh} kWh/yr</span>
+        </summary>
+        <div class="body">
+          <div class="row2">
+            <div class="k">Energy (clear-sky day) ${tip("Total energy for the selected day using clear-sky irradiance (best-case, no clouds).")}</div>
+            <div class="v">${dayKwh} kWh</div>
+
+            <div class="k">Year total (TMY/PVGIS) ${tip("Total yearly energy using PVGIS Typical Meteorological Year (TMY) data. More realistic than clear-sky.")}</div>
+            <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
+          </div>
+        </div>
+      </details>
+    `;
+
+    summaryEl.innerHTML = html;
+
+    // keep your plans rendering call:
+    renderPlans(data.plan);
   }
+
 
   function renderPlots(data) {
     const day = data.series_day;
@@ -190,6 +391,87 @@
     });
   }
 
+  function isUrl(s) {
+    return typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://"));
+  }
+
+  function niceLabel(key) {
+    // Optional: rename keys to nicer labels
+    const map = {
+      plannavn: "Plan name",
+      planid: "Plan ID",
+      plantype: "Plan type",
+      status: "Status",
+      doklink: "Document",
+      link: "Link",
+      url: "URL",
+      doklink: "Document"
+    };
+    return map[key] || key;
+  }
+
+  function renderPlans(plans) {
+    if (!plansEl) return;
+
+    if (!plans || plans.length === 0) {
+      plansEl.innerHTML = "<div class='small'>No plans found at clicked location.</div>";
+      return;
+    }
+
+    const parts = [];
+    parts.push(`<div class="small"><b>Found:</b> ${plans.length}</div>`);
+
+    plans.forEach((p, idx) => {
+      const name = p.plannavn || p.plan_navn || p.navn || `Plan ${idx + 1}`;
+      const id = p.planid ? String(p.planid) : "";
+      const status = p.status ? String(p.status) : "";
+
+      parts.push(`
+        <details class="planItem" ${idx === 0 ? "open" : ""}>
+          <summary>
+            ${escapeHtml(name)}
+            ${status ? `<span class="pill">${escapeHtml(status)}</span>` : ""}
+            ${id ? `<span class="pill">ID: ${escapeHtml(id)}</span>` : ""}
+          </summary>
+          <div class="planBody">
+            <div class="kv">
+              ${Object.entries(p).map(([k, v]) => {
+                if (v === null || v === undefined || v === "") return "";
+                const keyLabel = niceLabel(k);
+                const valStr = String(v);
+
+                if (isUrl(valStr)) {
+                  return `<div class="k">${escapeHtml(keyLabel)}</div>
+                          <div class="v"><a href="${escapeAttr(valStr)}" target="_blank" rel="noopener noreferrer">Åben Lokalplan</a></div>`;
+                }
+
+                return `<div class="k">${escapeHtml(keyLabel)}</div>
+                        <div class="v">${escapeHtml(valStr)}</div>`;
+              }).join("")}
+            </div>
+          </div>
+        </details>
+      `);
+    });
+
+    plansEl.innerHTML = parts.join("");
+  }
+
+  // Basic escaping to avoid breaking HTML if plan fields contain odd characters
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+  function escapeAttr(s) {
+    // For href attributes
+    return escapeHtml(s);
+  }
+
+
   async function init() {
     // Default date = today
     const today = new Date();
@@ -208,7 +490,7 @@
       opt.textContent = name;
       presetEl.appendChild(opt);
     }
-    presetEl.value = "Standard (20%, 10 m²)";
+    presetEl.value = "1 kWp";
     applyPreset(presetEl.value);
 
     presetEl.addEventListener("change", () => applyPreset(presetEl.value));
@@ -237,6 +519,7 @@
         });
       }
     });
+    
 
     // Planer layer (full, like original)
     const planer = await getJSON("/api/planer");
@@ -252,6 +535,25 @@
 
     bornholmLayer.addTo(map);
     planerLayer.addTo(map);
+    
+    const bounds = bornholmLayer.getBounds();
+    map.fitBounds(bounds.pad(0.15));
+    map.setMaxBounds(bounds.pad(0.25));
+
+    L.Control.geocoder({
+      defaultMarkGeocode: false,
+      placeholder: "Indtast adresse",
+      collapsed: false
+    })
+    .on('markgeocode', function(e) {
+      const latlng = e.geocode.center;
+
+      setSelected(latlng.lat, latlng.lng);  // your existing function
+      map.setView(latlng, 15);
+
+      if (marker) marker.setLatLng(latlng);
+    })
+    .addTo(map);
 
     // Layer control like original
     L.control.layers(
@@ -265,6 +567,7 @@
       setSelected(e.latlng.lat, e.latlng.lng);
     });
 
+
     // Buttons
     document.getElementById("btnSummary").onclick = async () => {
       if (!selected) {
@@ -277,8 +580,8 @@
       const params = new URLSearchParams({
         lat: selected.lat,
         lon: selected.lon,
-        area_m2: areaEl.value,
-        eff: effEl.value,
+        kwp: kwpEl.value,
+        pr: prEl.value,
         tilt: tiltEl.value,
         az: azEl.value,
         day: dayEl.value,
@@ -302,7 +605,7 @@
   }
 
   init().catch(err => {
-    out.textContent = "Init error:\n" + err;
+    summaryEl.textContent = "Init error:\n" + err;
     statusEl.textContent = "Error during initialization. See details in output box.";
     console.error(err);
   });

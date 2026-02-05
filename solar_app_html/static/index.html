@@ -84,6 +84,17 @@
 
     .section .body { padding: 10px; }
 
+    .warnPill{
+      display:inline-block;
+      padding:2px 8px;
+      margin-left:6px;
+      border-radius:999px;
+      background:#fff3cd;
+      color:#7a5c00;
+      font-size:12px;
+      font-weight:600;
+    }
+
     .row2 {
       display: grid;
       grid-template-columns: 160px 1fr;
@@ -102,6 +113,42 @@
       font-weight: 600;
       margin-left: 8px;
     }
+
+    .detailSection{
+      border: 1px solid #e6e6e6;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px 0;
+      background: #fafafa;
+    }
+
+    .detailTitle{
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .detailRow{
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 8px;
+      padding: 6px 0;
+      border-top: 1px solid #eee;
+    }
+
+    .detailRow:first-child{ border-top: none; }
+
+    .detailLabel{
+      font-size: 12px;
+      color: #555;
+    }
+
+    .detailValue{
+      font-size: 13px;
+      color: #111;
+      white-space: pre-wrap;
+      line-height: 1.35;
+    }
+
 
     /* Tooltip */
     .qm {
@@ -306,57 +353,60 @@
     const yearKwh = Math.round(data.energy_year_kwh_tmy);
 
     const html = `
-      <details class="section" open>
+      <details class="section">
         <summary>
-          Overview
-          <span class="badge">${locationStr}</span>
-        </summary>
-        <div class="body">
-          <div class="row2">
-            <div class="k">Location ${tip("Latitude/longitude of the clicked point on the map.")}</div>
-            <div class="v">${escapeHtml(locationStr)}</div>
-
-            <div class="k">Settings ${tip("kWp is the PV system rated power at STC. PR is a loss factor (1.00 = no losses). Tilt/azimuth define panel orientation.")}</div>
-            <div class="v">${escapeHtml(settingsStr)}</div>
-
-            <div class="k">Selected day ${tip("Day used for the clear-sky 24h curve. This is not measured weather; it is a theoretical clear-sky model.")}</div>
-            <div class="v">${escapeHtml(s.day)} (step=${escapeHtml(s.freq)})</div>
-          </div>
-        </div>
-      </details>
-
-      <details class="section" open>
-        <summary>
-          Peak values (selected day)
-          <span class="badge">${peakPower} W</span>
-        </summary>
-        <div class="body">
-          <div class="row2">
-            <div class="k">Peak POA ${tip("Plane-of-array irradiance (W/m²) on the tilted panel surface.")}</div>
-            <div class="v">${peakPoa} W/m²</div>
-
-            <div class="k">Peak PV power ${tip("Estimated DC power output at that moment: P ≈ kWp × POA (W/m²) × PR.")}</div>
-            <div class="v">${peakPower} W</div>
-          </div>
-        </div>
-      </details>
-
-      <details class="section" open>
-        <summary>
-          Energy results
+          PV results
           <span class="badge">${yearKwh} kWh/yr</span>
         </summary>
-        <div class="body">
-          <div class="row2">
-            <div class="k">Energy (clear-sky day) ${tip("Total energy for the selected day using clear-sky irradiance (best-case, no clouds).")}</div>
-            <div class="v">${dayKwh} kWh</div>
 
-            <div class="k">Year total (TMY/PVGIS) ${tip("Total yearly energy using PVGIS Typical Meteorological Year (TMY) data. More realistic than clear-sky.")}</div>
-            <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
-          </div>
+        <div class="body">
+
+          <details class="section" open>
+            <summary>Overview</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Location ${tip("Latitude/longitude of the clicked point on the map.")}</div>
+                <div class="v">${escapeHtml(locationStr)}</div>
+
+                <div class="k">Settings ${tip("kWp is the PV system rated power at STC. PR is a loss factor (1.00 = no losses). Tilt/azimuth define panel orientation.")}</div>
+                <div class="v">${escapeHtml(settingsStr)}</div>
+
+                <div class="k">Selected day</div>
+                <div class="v">${escapeHtml(s.day)} (step=${escapeHtml(s.freq)})</div>
+              </div>
+            </div>
+          </details>
+
+          <details class="section" open>
+            <summary>Peak values</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Peak POA</div>
+                <div class="v">${peakPoa} W/m²</div>
+
+                <div class="k">Peak PV power</div>
+                <div class="v">${peakPower} W</div>
+              </div>
+            </div>
+          </details>
+
+          <details class="section" open>
+            <summary>Energy results</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Clear-sky day</div>
+                <div class="v">${dayKwh} kWh</div>
+
+                <div class="k">Year total (TMY/PVGIS)</div>
+                <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
+              </div>
+            </div>
+          </details>
+
         </div>
       </details>
     `;
+
 
     summaryEl.innerHTML = html;
 
@@ -410,6 +460,78 @@
     return map[key] || key;
   }
 
+  function isEmptyVal(v) {
+    return v === null || v === undefined || String(v).trim() === "";
+  }
+
+  function renderDetailSection(title, items) {
+    const rows = items
+      .filter(it => !isEmptyVal(it.value))
+      .map(it => `
+        <div class="detailRow">
+          <div class="detailLabel">${escapeHtml(it.label)}</div>
+          <div class="detailValue">${escapeHtml(String(it.value))}</div>
+        </div>
+      `)
+      .join("");
+
+    if (!rows) return "";
+
+    return `
+      <div class="detailSection">
+        <div class="detailTitle">${escapeHtml(title)}</div>
+        <div class="detailBody">${rows}</div>
+      </div>
+    `;
+  }
+
+  function renderDetails(details) {
+    if (!details || !Array.isArray(details) || details.length === 0) {
+      return "<div class='small'>No extra details.</div>";
+    }
+
+    const d = details[0];
+
+    const sol = renderDetailSection("Sol", [
+      { label: "Side", value: d.sol_side },
+      { label: "Paragraf", value: d.sol_paragraf },
+      { label: "Kommentar", value: d.kommentar_sol },
+    ]);
+
+    const vind = renderDetailSection("Vind", [
+      { label: "Side", value: d.vind_side },
+      { label: "Paragraf", value: d.vind_paragraf },
+      { label: "Kommentar", value: d.kommentar_vind },
+    ]);
+
+    const batteri = renderDetailSection("Batteri", [
+      { label: "Side", value: d.batteri_side },
+      { label: "Paragraf", value: d.batteri_paragraf },
+      { label: "Kommentar", value: d.kommentar_batteri },
+    ]);
+
+    const tekniske = renderDetailSection("Tekniske anlæg", [
+      { label: "Side", value: d.tekniske_anlaeg_side },
+      { label: "Paragraf", value: d.tekniske_anlaeg_paragraf },
+      { label: "Kommentar", value: d.kommentar_tekniske_anlaeg },
+    ]);
+
+    const andet = renderDetailSection("Andet relevant regulering", [
+      { label: "Side", value: d.andet_side },
+      { label: "Paragraf", value: d.andet_paragraf },
+      { label: "Kommentar", value: d.kommentar_andet_regulering },
+    ]);
+
+    const kort = renderDetailSection("Kort kommentar", [
+      { label: "Kommentar", value: d.kommentar_kort },
+    ]);
+
+    const html = [sol, vind, batteri, tekniske, andet, kort].filter(Boolean).join("");
+
+    return html || "<div class='small'>No relevant fields found in details.</div>";
+  }
+
+
   function renderPlans(plans) {
     if (!plansEl) return;
 
@@ -425,24 +547,44 @@
       const name = p.plannavn || p.plan_navn || p.navn || `Plan ${idx + 1}`;
       const id = p.planid ? String(p.planid) : "";
       const status = p.status ? String(p.status) : "";
+      const det = p.details?.[0] || {};
 
+      function warn(flag, label){
+        return flag ? `<span class="warnPill">⚠ ${label}</span>` : "";
+      }
+
+      const warnings = [
+        warn(det.sol_relevant, "Sol"),
+        warn(det.vind_relevant, "Vind"),
+        warn(det.batteri_relevant, "Batteri"),
+        warn(det.tekniske_anlaeg_relevant, "Teknik"),
+        warn(det.andet_relevant_regulering, "Andet"),
+      ].join("");
+
+      // Her kan der udføres visuelle ændringer for plan-interface på HTML
       parts.push(`
-        <details class="planItem" ${idx === 0 ? "open" : ""}>
+        <details class="planItem">
           <summary>
             ${escapeHtml(name)}
-            ${status ? `<span class="pill">${escapeHtml(status)}</span>` : ""}
             ${id ? `<span class="pill">ID: ${escapeHtml(id)}</span>` : ""}
+            ${warnings}
           </summary>
           <div class="planBody">
             <div class="kv">
               ${Object.entries(p).map(([k, v]) => {
                 if (v === null || v === undefined || v === "") return "";
                 const keyLabel = niceLabel(k);
+
+                // ✅ Special rendering for details (array of objects)
+                if (k === "details") {
+                  return `<div style="grid-column: 1 / -1;">${renderDetails(v)}</div>`;
+                }
+
                 const valStr = String(v);
 
                 if (isUrl(valStr)) {
                   return `<div class="k">${escapeHtml(keyLabel)}</div>
-                          <div class="v"><a href="${escapeAttr(valStr)}" target="_blank" rel="noopener noreferrer">Åben Lokalplan</a></div>`;
+                          <div class="v"><a href="${escapeAttr(valStr)}" target="_blank" rel="noopener noreferrer">Open document</a></div>`;
                 }
 
                 return `<div class="k">${escapeHtml(keyLabel)}</div>

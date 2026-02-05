@@ -6,6 +6,9 @@ from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import re
+import csv
+from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 import pvlib
@@ -41,6 +44,78 @@ FREQ_OPTIONS = {
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+DETAILS_CSV_PATH = Path(__file__).resolve().parent / "theMASTERplan - Lokal_Plan.csv"
+
+def _extract_planid_from_doklink(doklink: str) -> int | None:
+    if not isinstance(doklink, str):
+        return None
+    m = re.search(r"20_(\d+)_", doklink)
+    return int(m.group(1)) if m else None
+
+def _df_row_to_jsonable(d: dict) -> dict:
+    # Convert pandas/numpy types + NaN to JSON-friendly python types
+    out = {}
+    for k, v in d.items():
+        if v is None:
+            out[k] = None
+            continue
+        if isinstance(v, float) and math.isnan(v):
+            out[k] = None
+            continue
+        if pd.isna(v):
+            out[k] = None
+            continue
+        if isinstance(v, (np.integer,)):
+            out[k] = int(v)
+            continue
+        if isinstance(v, (np.floating,)):
+            out[k] = float(v)
+            continue
+        if isinstance(v, pd.Timestamp):
+            out[k] = v.date().isoformat()
+            continue
+        out[k] = v
+    return out
+
+def load_plan_details(csv_path: Path) -> dict[int, list[dict]]:
+    """
+    Returns mapping: planid -> [details_row_dict, ...]
+    Using list allows multiple rows per planid (future-proof).
+    """
+    if not csv_path.exists():
+        print(f"WARNING: details CSV not found at {csv_path.resolve()}. Continuing without extra plan details.")
+        return {}
+
+    
+    df = pd.read_csv(
+        csv_path,
+        sep=",",                  # IMPORTANT: your file is comma-separated
+        encoding="utf-8-sig",
+        engine="python",          # tolerant, but still consistent
+        na_values=["null", "NULL", ""],  # convert "null" strings to NaN
+        keep_default_na=True,
+        quoting=csv.QUOTE_MINIMAL
+    )
+
+    # If you want datovedt as proper date:
+    if "datovedt" in df.columns:
+        df["datovedt"] = pd.to_datetime(df["datovedt"], errors="coerce")
+
+    if "doklink" not in df.columns:
+        print("WARNING: details CSV has no 'doklink' column; cannot extract planid.")
+        return {}
+
+    df["planid"] = df["doklink"].apply(_extract_planid_from_doklink)
+    df = df[df["planid"].notna()].copy()
+    df["planid"] = df["planid"].astype(int)
+
+    details_by_planid: dict[int, list[dict]] = {}
+    for _, row in df.iterrows():
+        r = row.to_dict()
+        planid = int(r.pop("planid"))
+        details_by_planid.setdefault(planid, []).append(_df_row_to_jsonable(r))
+
+    return details_by_planid
 
 # ----------------------------
 # Solar computation helpers (mirrors MapAndSolar_V2.py)
@@ -182,15 +257,23 @@ def _planer_prepare_for_query(planer: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 def _pick_summary_fields(planer_cols):
     preferred = [
         "plannavn", "plan_navn", "navn", "name", "titel", "title",
-        "planid", "plan_id", "lokalplan", "lokalplan_nr", "nummer",
+        "planid", "plan_id", "id",
         "plantype", "type", "status",
         "vedtaget", "vedtagelsesdato", "dato", "startdato", "slutdato",
         "link", "url", "doklink"
     ]
+
     chosen = [c for c in preferred if c in planer_cols and c != "geometry"]
     if not chosen:
         chosen = [c for c in planer_cols if c != "geometry"][:10]
-    return chosen[:12]
+
+    chosen = chosen[:12]
+
+    if "doklink" in planer_cols and "doklink" not in chosen:
+        chosen[-1] = "doklink"
+
+    return chosen
+
 
 def find_plans_at_point(planer_query: gpd.GeoDataFrame, lat: float, lon: float) -> gpd.GeoDataFrame:
     """
@@ -218,8 +301,6 @@ def find_plans_at_point(planer_query: gpd.GeoDataFrame, lat: float, lon: float) 
     hits = hits.sort_values("_area_m2").drop(columns=["_area_m2"])
     return hits
 
-
-
 # ----------------------------
 # Load data once (like notebook script)
 # ----------------------------
@@ -234,6 +315,8 @@ planer_query_proj = planer_query.to_crs(25833)
 planer_map = sanitize_for_geojson(planer_query)
 
 PLAN_SUMMARY_FIELDS = _pick_summary_fields(planer_map.columns)
+PLAN_DETAILS_BY_ID = load_plan_details(DETAILS_CSV_PATH)
+print(f"Plan details loaded: {len(PLAN_DETAILS_BY_ID)} unique planids")
 
 bornholm_proj = bornholm.to_crs(25833)
 centroid_wgs84 = bornholm_proj.geometry.centroid.to_crs(4326).iloc[0]
@@ -300,8 +383,6 @@ def api_summary(
     lat: float,
     lon: float,
 
-    
-
     # New style
     kwp: float | None = Query(None),
     pr: float = Query(1.0),
@@ -341,13 +422,38 @@ def api_summary(
     if not hits.empty:
         for _, row in hits.iterrows():
             d = {}
+
+            # Collect plan fields
             for c in PLAN_SUMMARY_FIELDS:
                 if c in row.index and c != "geometry":
                     d[c] = _json_safe(row[c])
-            # Only append non-empty dicts (optional)
+
+            # Compute planid for joining (prefer doklink extraction)
+            planid_int = None
+            if d.get("doklink"):
+                planid_int = _extract_planid_from_doklink(str(d["doklink"]))
+
+            # Fallbacks if doklink missing
+            if planid_int is None:
+                for key in ("planid", "plan_id", "id"):
+                    val = d.get(key)
+                    try:
+                        if val is not None:
+                            planid_int = int(val)
+                            break
+                    except (TypeError, ValueError):
+                        pass
+
+            # Attach CSV details
+            if planid_int is not None:
+                details = PLAN_DETAILS_BY_ID.get(planid_int)
+                if details:
+                    d["details"] = details
+
             plans_data.append(d)
 
     plan_data = plans_data if plans_data else None
+
 
 
     # Series for plots

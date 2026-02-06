@@ -1,0 +1,24 @@
+{
+  "layers": [
+    {
+      "id": "planer",
+      "name": "Lokal Planer",
+      "show_in_control": true,
+      "enabled_by_default": true,
+      "style": { "color": "#6499fb", "weight": 1, "fillOpacity": 0.2 }
+    },
+    {
+      "id": "natura_selected",
+      "name": "Natura 2000 Områder",
+      "show_in_control": true,
+      "enabled_by_default": false,
+      "style": {
+        "color": "#2e7d32",
+        "fillColor": "#66bb6a",
+        "dashArray": "6 6",
+        "weight": 2,
+        "fillOpacity": 0.25
+      }
+    }
+  ]
+}

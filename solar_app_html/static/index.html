@@ -216,8 +216,15 @@
       display: none;
     }
 
-
-
+    .layer-swatch{
+      display:inline-block;
+      width:12px;
+      height:12px;
+      border-radius:3px;
+      margin-right:6px;
+      border:2px solid #666;
+      vertical-align:middle;
+    }
 
   </style>
 </head>
@@ -414,6 +421,26 @@
     renderPlans(data.plan);
   }
 
+  function applyLayerSwatches(layerControl, styleByDisplayName) {
+    const root = layerControl.getContainer();
+    const labels = root.querySelectorAll(".leaflet-control-layers-overlays label");
+
+    labels.forEach(label => {
+      const text = label.textContent.trim(); // displayed name
+      const st = styleByDisplayName[text];
+      if (!st) return;
+
+      if (label.querySelector(".layer-swatch")) return;
+
+      const sw = document.createElement("span");
+      sw.className = "layer-swatch";
+      sw.style.borderColor = st.color || "#666";
+      sw.style.background = st.fillColor || st.color || "#999";
+      sw.style.opacity = (st.fillOpacity ?? 0.25);
+
+      label.insertBefore(sw, label.firstChild);
+    });
+  }
 
   function renderPlots(data) {
     const day = data.series_day;
@@ -613,7 +640,6 @@
     return escapeHtml(s);
   }
 
-
   async function init() {
     // Default date = today
     const today = new Date();
@@ -621,6 +647,7 @@
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
     dayEl.value = `${yyyy}-${mm}-${dd}`;
+    const extraOverlays = {}; // name -> Leaflet layer
 
     const presetsResp = await getJSON("/api/presets");
     PRESETS = presetsResp.presets;
@@ -641,46 +668,59 @@
 
     // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       minZoom: 10,
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    });
+    osm.addTo(map);
 
     // Marker visible immediately (like original)
     marker = L.marker([center.lat, center.lon]).addTo(map);
     setSelected(center.lat, center.lon);
 
-    // Bornholm layer
-    const bornholm = await getJSON("/api/bornholm");
-    const bornholmLayer = L.geoJSON(bornholm, {
-      style: { weight: 2, fillOpacity: 0.05 },
-      onEachFeature: (feature, layer) => {
-        layer.on("click", (e) => {
-          setSelected(e.latlng.lat, e.latlng.lng);
-        });
-      }
-    });
-    
+    // ----- Layers from backend config (/api/layers) -----
+    const overlays = {};
+    const styleByDisplayName = {};
 
-    // Planer layer (full, like original)
-    const planer = await getJSON("/api/planer");
-    const planerLayer = L.geoJSON(planer, {
-      style: { weight: 1, fillOpacity: 0.10 },
-      onEachFeature: (feature, layer) => {
-        // IMPORTANT: clicking polygons should still select location
-        layer.on("click", (e) => {
-          setSelected(e.latlng.lat, e.latlng.lng);
-        });
-      }
-    });
+    const layersResp = await getJSON("/api/layers");
+    const layerMeta = layersResp.layers || [];
 
-    bornholmLayer.addTo(map);
-    planerLayer.addTo(map);
-    
-    const bounds = bornholmLayer.getBounds();
-    map.fitBounds(bounds.pad(0.15));
-    map.setMaxBounds(bounds.pad(0.25));
+    let boundsLayer = null;
+
+    for (const info of layerMeta) {
+      const gj = await getJSON(`/api/layers/${encodeURIComponent(info.id)}`);
+
+      const style = info.style || { color: "#666", weight: 2, fillOpacity: 0.10 };
+
+      const gjLayer = L.geoJSON(gj, {
+        style,
+        onEachFeature: (feature, layer) => {
+          layer.on("click", (e) => setSelected(e.latlng.lat, e.latlng.lng));
+        }
+      });
+
+      // Swatches keyed by the displayed GUI name
+      styleByDisplayName[info.name] = style;
+
+      // Add to layer control only if allowed
+      if (info.show_in_control) {
+        overlays[info.name] = gjLayer;
+      }
+
+      // Add to map by default if enabled
+      if (info.enabled_by_default) {
+        gjLayer.addTo(map);
+        if (!boundsLayer) boundsLayer = gjLayer;
+      }
+    }
+
+    // Optional: fit to the first default-enabled layer (if it exists)
+    if (boundsLayer && boundsLayer.getBounds && boundsLayer.getBounds().isValid()) {
+      const b = boundsLayer.getBounds();
+      map.fitBounds(b.pad(0.15));
+      map.setMaxBounds(b.pad(0.25));
+    }
 
     L.Control.geocoder({
       defaultMarkGeocode: false,
@@ -697,17 +737,17 @@
     })
     .addTo(map);
 
-    // Layer control like original
-    L.control.layers(
-      { "OpenStreetMap": L.tileLayer },
-      { "Bornholm": bornholmLayer, "Lokal Planer": planerLayer },
-      { collapsed: false }
-    );
-
     // Map click (works everywhere not caught by polygons)
     map.on("click", (e) => {
       setSelected(e.latlng.lat, e.latlng.lng);
     });
+
+    // ----- Layer control (built from config-loaded overlays) -----
+    const baseLayers = { "OpenStreetMap": osm };
+    const layerControl = L.control.layers(baseLayers, overlays, { collapsed: false }).addTo(map);
+
+    // Add swatches once (must happen AFTER control is added)
+    setTimeout(() => applyLayerSwatches(layerControl, styleByDisplayName), 0);
 
 
     // Buttons

@@ -1,21 +1,21 @@
 from __future__ import annotations
-
 from functools import lru_cache
-
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-
+from typing import Any
+from pathlib import Path
+from shapely.geometry import Point
 import re
 import csv
-from pathlib import Path
+import json
 import geopandas as gpd
 import pandas as pd
 import pvlib
 import numpy as np
 import math
 
-from shapely.geometry import Point
+
 
 
 # ----------------------------
@@ -36,6 +36,12 @@ FREQ_OPTIONS = {
     "15 min": "15min",
     "5 min": "5min",
 }
+
+LAYERS_DIR = Path(__file__).resolve().parent / "layers"
+LAYERS_CONFIG_PATH = LAYERS_DIR / "layers_config.json"
+
+BUILTIN_LAYER_IDS = {"bornholm", "planer"}  # served from memory, not from file
+
 
 
 # ----------------------------
@@ -116,6 +122,9 @@ def load_plan_details(csv_path: Path) -> dict[int, list[dict]]:
         details_by_planid.setdefault(planid, []).append(_df_row_to_jsonable(r))
 
     return details_by_planid
+
+def _layer_id_from_path(p: Path) -> str:
+    return p.stem  # filename without extension
 
 # ----------------------------
 # Solar computation helpers (mirrors MapAndSolar_V2.py)
@@ -304,12 +313,12 @@ def find_plans_at_point(planer_query: gpd.GeoDataFrame, lat: float, lon: float) 
 # ----------------------------
 # Load data once (like notebook script)
 # ----------------------------
-gdf = gpd.read_file("municipalities.geojson").to_crs(4326)
+gdf = gpd.read_file(LAYERS_DIR / "municipalities.geojson").to_crs(4326)
 bornholm = gdf[gdf["label_dk"].str.contains("Bornholm", case=False)].copy()
 if bornholm.empty:
     raise ValueError("Could not find Bornholm in 'label_dk'.")
 
-planer_raw = gpd.read_file("planer.geojson")
+planer_raw = gpd.read_file(LAYERS_DIR / "planer.geojson")
 planer_query = _planer_prepare_for_query(planer_raw)
 planer_query_proj = planer_query.to_crs(25833)
 planer_map = sanitize_for_geojson(planer_query)
@@ -317,6 +326,8 @@ planer_map = sanitize_for_geojson(planer_query)
 PLAN_SUMMARY_FIELDS = _pick_summary_fields(planer_map.columns)
 PLAN_DETAILS_BY_ID = load_plan_details(DETAILS_CSV_PATH)
 print(f"Plan details loaded: {len(PLAN_DETAILS_BY_ID)} unique planids")
+HIDDEN_LAYER_IDS = {"municipalities", "planer"}  # built-ins, not optional overlays
+
 
 bornholm_proj = bornholm.to_crs(25833)
 centroid_wgs84 = bornholm_proj.geometry.centroid.to_crs(4326).iloc[0]
@@ -377,6 +388,116 @@ def api_bornholm():
 def api_planer():
     # Full plans, like original (performance later)
     return JSONResponse(planer_map.__geo_interface__)
+
+@app.get("/api/layers")
+def api_layers():
+    """
+    Returns layer metadata.
+    Priority:
+      1) layers_config.json if present
+      2) fallback: all *.geojson files in ./layers
+    """
+    # ---- 1) If config exists, use it ----
+    if LAYERS_CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(LAYERS_CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception as e:
+            return JSONResponse({"error": f"Failed to parse layers_config.json: {e}"}, status_code=500)
+
+        # Allow both formats:
+        # A) list[dict]
+        # B) {"layers": list[dict]}
+        if isinstance(cfg, dict):
+            entries = cfg.get("layers", [])
+        else:
+            entries = cfg
+
+        if not isinstance(entries, list):
+            return JSONResponse({"error": "layers_config.json must be a list OR {\"layers\": [...] }"}, status_code=500)
+
+        out = []
+        for entry in entries:
+            # Robust: skip non-dicts (this prevents your current crash)
+            if not isinstance(entry, dict):
+                continue
+
+            layer_id = entry.get("id")
+            if not layer_id or not isinstance(layer_id, str):
+                continue
+
+            # Must exist as a geojson file in ./layers
+            path = (LAYERS_DIR / f"{layer_id}.geojson")
+            if not path.exists():
+                continue
+
+            out.append({
+                "id": layer_id,
+                "name": entry.get("name", layer_id.replace("_", " ").title()),
+                "style": entry.get("style"),
+                "show_in_control": bool(entry.get("show_in_control", True)),
+                "enabled_by_default": bool(entry.get("enabled_by_default", False)),
+            })
+
+        return {"layers": out}
+
+    # ---- 2) Fallback: auto-discover geojson files ----
+    if not LAYERS_CONFIG_PATH.exists():
+        return {"layers": []}
+
+    cfg = json.loads(LAYERS_CONFIG_PATH.read_text(encoding="utf-8"))
+    raw_layers = cfg.get("layers", [])
+
+    out = []
+    for entry in raw_layers:
+        if not isinstance(entry, dict):
+            continue
+
+        layer_id = entry.get("id")
+        if not layer_id:
+            continue
+
+        # only expose layers that actually exist
+        p = (LAYERS_DIR / f"{layer_id}.geojson")
+        if not p.exists():
+            continue
+
+        out.append({
+            "id": layer_id,
+            "name": entry.get("name", layer_id.replace("_", " ").title()),
+            "style": entry.get("style") or None,
+            "show_in_control": bool(entry.get("show_in_control", True)),
+            "enabled_by_default": bool(entry.get("enabled_by_default", False)),
+        })
+
+    return {"layers": out}
+
+
+@app.get("/api/layers/{layer_id}")
+def api_layer_geojson(layer_id: str):
+    """
+    Returns GeoJSON for either:
+    - built-in layers: "bornholm", "planer"
+    - file layers: ./layers/{layer_id}.geojson
+    """
+    layer_id = str(layer_id).strip()
+
+    if layer_id == "bornholm":
+        return JSONResponse(bornholm.__geo_interface__)
+
+    if layer_id == "planer":
+        return JSONResponse(planer_map.__geo_interface__)
+
+    # file layer
+    path = (LAYERS_DIR / f"{layer_id}.geojson").resolve()
+
+    if not str(path).startswith(str(LAYERS_DIR.resolve())):
+        return JSONResponse({"error": "Invalid layer id"}, status_code=400)
+
+    if not path.exists():
+        return JSONResponse({"error": "Layer not found"}, status_code=404)
+
+    return FileResponse(path, media_type="application/geo+json")
+
 
 @app.get("/api/summary")
 def api_summary(

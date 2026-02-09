@@ -14,6 +14,9 @@ import pandas as pd
 import pvlib
 import numpy as np
 import math
+from pathlib import Path
+import simulation
+
 
 
 
@@ -42,6 +45,9 @@ LAYERS_CONFIG_PATH = LAYERS_DIR / "layers_config.json"
 
 BUILTIN_LAYER_IDS = {"bornholm", "planer"}  # served from memory, not from file
 
+DATA_DIR = Path(__file__).resolve().parent / "calculations/Dataset"
+CONSUMPTION_PATH = DATA_DIR / "consumption_private_scaled_hourly.csv"
+PRICES_PATH = DATA_DIR / "elspot_DK1_with_total_prices.csv"
 
 
 # ----------------------------
@@ -607,3 +613,58 @@ def api_summary(
         "series_day": series_day,
         "series_year": series_year,
     }
+
+@app.get("/api/simulate_day")
+def api_simulate_day(
+    lat: float,
+    lon: float,
+    kwp: float = Query(1.0),
+    pr: float = Query(1.0),
+    tilt: float = Query(40.0),
+    az: float = Query(180.0),
+    day: str = Query(...),
+    freq: str = Query("1h"),
+):
+    # PV power series (local TZ)
+    df_pv = daily_profile(lat, lon, kwp, tilt, az, day, freq, pr=pr)
+
+    # Convert to pv_kwh per interval, then convert index to UTC for joining
+    pv_kwh_local = simulation.energy_kwh_from_power(df_pv["power_w"])
+    pv_df = pd.DataFrame({"pv_kwh": pv_kwh_local})
+    pv_df.index = pv_df.index.tz_convert("UTC")
+    pv_df.index.name = "TimeUTC"
+
+    # Interpret "day" as DK local day and convert to UTC window
+    start_local = pd.Timestamp(day).tz_localize(TZ)
+    end_local = start_local + pd.Timedelta(days=1)
+    start_utc = start_local.tz_convert("UTC")
+    end_utc = end_local.tz_convert("UTC")
+
+    # Load consumption + prices (UTC indexed)
+    load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
+    price_df = simulation.read_prices(str(PRICES_PATH))
+
+    load_day = load_df.loc[start_utc:end_utc]
+    price_day = price_df.loc[start_utc:end_utc]
+
+    # Align strictly on timestamps
+    df = load_day.join(price_day, how="inner").join(pv_df, how="left")
+    df["pv_kwh"] = df["pv_kwh"].fillna(0.0)
+
+    df_sim = simulation.simulate_no_battery(df)
+    summary = simulation.compute_costs(df_sim)
+
+    return {
+        "inputs": {"day": day, "freq": freq},
+        "summary": summary,
+        "series": {
+            "t": [t.isoformat() for t in df_sim.index],
+            "load_kwh": df_sim["load_kwh"].tolist(),
+            "pv_kwh": df_sim["pv_kwh"].tolist(),
+            "import_kwh": df_sim["import_kwh"].tolist(),
+            "export_kwh": df_sim["export_kwh"].tolist(),
+            "buy_price": df_sim["buy_price_dkk_per_kwh"].tolist(),
+            "sell_price": df_sim["sell_price_dkk_per_kwh"].tolist(),
+        },
+    }
+

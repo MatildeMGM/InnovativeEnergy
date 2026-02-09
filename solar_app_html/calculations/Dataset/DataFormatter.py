@@ -265,11 +265,11 @@ plot_price_days(
     title="Total household electricity price"
 )
 
-# spot only (for comparison)
-plot_price_days(
-    ["2025-01-15", "2025-04-15", "2025-07-15"],
-    column="price_dkk_per_kwh",
-    title="Spot price only"
-)
+# # spot only (for comparison)
+# plot_price_days(
+#     ["2025-01-15", "2025-04-15", "2025-07-15"],
+#     column="price_dkk_per_kwh",
+#     title="Spot price only"
+# )
 
 # %%

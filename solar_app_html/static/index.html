@@ -275,6 +275,8 @@
 
     <button id="btnSummary">Refresh summary</button>
     <button id="btnPlots">Show plots</button>
+    <button id="btnSim">Run Solar simulation</button>
+
 
     <div class="hr"></div>
 
@@ -282,6 +284,9 @@
     <div class="small"><b>Selected:</b> <span id="coord">—</span></div>
 
     <div id="summary">No summary yet.</div>
+    <div class="hr"></div>
+    <div id="simulation">No simulation yet.</div>
+
 
     <div class="hr"></div>
     <h4 style="margin: 8px 0;">Plans</h4>
@@ -308,6 +313,10 @@
   const dayEl = document.getElementById("day");
   const freqEl = document.getElementById("freq");
 
+  const simBox = document.getElementById("simBox");
+  const simEl = document.getElementById("simulation");
+
+
   let PRESETS = {};
   let selected = null;
   let marker = null;
@@ -321,6 +330,85 @@
     if (!r.ok) throw new Error(await r.text());
     return await r.json();
   }
+
+  function renderSimulation(data) {
+    const s = data.summary;
+
+    function fmt(x, digits = 2) {
+      if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
+      return Number(x).toFixed(digits);
+    }
+
+    function pct(x) {
+      if (x === null || x === undefined) return "—";
+      return (Number(x) * 100).toFixed(1) + " %";
+    }
+
+    const html = `
+      <details class="section" open>
+        <summary>
+          Simulation results
+          <span class="badge">${fmt(s.savings_dkk)} DKK</span>
+        </summary>
+
+        <div class="body">
+
+          <details class="section" open>
+            <summary>Costs</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Baseline cost</div>
+                <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
+
+                <div class="k">Cost with PV</div>
+                <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
+
+                <div class="k">Savings</div>
+                <div class="v"><b>${fmt(s.savings_dkk)} DKK</b></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="section" open>
+            <summary>Energy flows</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Load</div>
+                <div class="v">${fmt(s.load_kwh)} kWh</div>
+
+                <div class="k">PV production</div>
+                <div class="v">${fmt(s.pv_kwh)} kWh</div>
+
+                <div class="k">Grid import</div>
+                <div class="v">${fmt(s.import_kwh)} kWh</div>
+
+                <div class="k">Grid export</div>
+                <div class="v">${fmt(s.export_kwh)} kWh</div>
+              </div>
+            </div>
+          </details>
+
+          <details class="section" open>
+            <summary>Key ratios</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Self-consumption</div>
+                <div class="v">${pct(s.self_consumption_ratio)}</div>
+
+                <div class="k">Self-sufficiency</div>
+                <div class="v">${pct(s.self_sufficiency)}</div>
+              </div>
+            </div>
+          </details>
+
+        </div>
+      </details>
+    `;
+
+    simEl.innerHTML = html;
+  }
+
+
 
   function setSelected(lat, lon) {
     selected = {lat, lon};
@@ -646,7 +734,7 @@
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
-    dayEl.value = `${yyyy}-${mm}-${dd}`;
+    dayEl.value = "2025-06-15";
     const extraOverlays = {}; // name -> Leaflet layer
 
     const presetsResp = await getJSON("/api/presets");
@@ -784,6 +872,38 @@
       renderPlots(lastSummary);
       statusEl.textContent = "Plots updated.";
     };
+
+    document.getElementById("btnSim").onclick = async () => {
+      if (!selected) {
+        statusEl.textContent = "Click map to set location first.";
+        return;
+      }
+
+      statusEl.textContent = "Running simulation…";
+      simEl.innerHTML = "<div class='small'>Running simulation…</div>";
+
+      const params = new URLSearchParams({
+        lat: selected.lat,
+        lon: selected.lon,
+        kwp: kwpEl.value,
+        pr: prEl.value,
+        tilt: tiltEl.value,
+        az: azEl.value,
+        day: dayEl.value,
+        freq: freqEl.value,
+      });
+
+      try {
+        const data = await getJSON(`/api/simulate_day?${params.toString()}`);
+        renderSimulation(data);
+        statusEl.textContent = "Simulation finished.";
+      } catch (err) {
+        simEl.innerHTML = "<pre class='small'>Simulation error:\n" + escapeHtml(String(err)) + "</pre>";
+        statusEl.textContent = "Simulation failed. See output box.";
+        console.error(err);
+      }
+    };
+
   }
 
   init().catch(err => {

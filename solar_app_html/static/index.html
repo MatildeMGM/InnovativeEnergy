@@ -226,11 +226,87 @@
       vertical-align:middle;
     }
 
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+    }
+    .modalCard {
+      width: min(1100px, 96vw);
+      max-height: 92vh;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+    }
+    .modalHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #e6e6e6;
+    }
+    .modalClose {
+      padding: 8px 10px;
+      width: auto;
+      margin: 0;
+    }
+    .modalBody {
+      padding: 12px;
+      overflow: auto;
+    }
+    .modalGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .modalPanel {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    @media (max-width: 900px) {
+      .modalGrid { grid-template-columns: 1fr; }
+    }
+
+
   </style>
 </head>
 
 <body>
 <div id="wrap">
+  <!-- Monthly modal -->
+  <div id="monthlyModal" class="modal" style="display:none;">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div style="font-weight:700;">Monthly overview (2025)</div>
+        <button id="btnMonthlyClose" class="modalClose">Close</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="modalGrid">
+          <div class="modalPanel">
+            <div class="small"><b>Energy balance (kWh)</b></div>
+            <canvas id="chartMonthlyEnergy"></canvas>
+          </div>
+
+          <div class="modalPanel">
+            <div class="small"><b>Costs and savings (DKK)</b></div>
+            <canvas id="chartMonthlyCost"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>  
   <div id="side">
     <h1>PV estimator</h1>
 
@@ -274,7 +350,7 @@
     </div>
 
     <button id="btnSummary">Refresh summary</button>
-    <button id="btnPlots">Show plots</button>
+    <button id="btnMonthly">Monthly overview (2025)</button>
 
     <div class="hr"></div>
 
@@ -291,9 +367,6 @@
     <div class="hr"></div>
     <h4 style="margin: 8px 0;">Plans</h4>
     <div id="plans">No plans yet.</div>
-
-    <canvas id="chartDay" height="140"></canvas>
-    <canvas id="chartYear" height="140"></canvas>
   </div>
 
   <div id="map"></div>
@@ -323,8 +396,10 @@
   let selected = null;
   let marker = null;
 
-  let chartDay = null;
-  let chartYear = null;
+  let lastYearSim = null;
+  let chartMonthlyEnergy = null;
+  let chartMonthlyCost = null;
+
   let lastSummary = null;
 
   async function getJSON(url) {
@@ -332,6 +407,68 @@
     if (!r.ok) throw new Error(await r.text());
     return await r.json();
   }
+
+  function openMonthlyModal() {
+    document.getElementById("monthlyModal").style.display = "flex";
+  }
+  function closeMonthlyModal() {
+    document.getElementById("monthlyModal").style.display = "none";
+  }
+
+  function renderMonthlyCharts(yearSim) {
+    if (!yearSim || !yearSim.monthly) {
+      throw new Error("No yearly monthly data available. Click Refresh summary first.");
+    }
+
+    const m = yearSim.monthly;
+    const labels = m.month;
+
+    // Destroy existing charts
+    if (chartMonthlyEnergy) chartMonthlyEnergy.destroy();
+    if (chartMonthlyCost) chartMonthlyCost.destroy();
+
+    // 1) Monthly energy balance (stacked)
+    chartMonthlyEnergy = new Chart(document.getElementById("chartMonthlyEnergy"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Load (kWh)", data: m.load_kwh, stack: "kwh" },
+          { label: "PV (kWh)", data: m.pv_kwh, stack: "kwh" },
+          { label: "Import (kWh)", data: m.import_kwh, stack: "kwh2" },
+          { label: "Export (kWh)", data: m.export_kwh, stack: "kwh2" },
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true }
+        }
+      }
+    });
+
+    // 2) Monthly costs/savings (bars)
+    chartMonthlyCost = new Chart(document.getElementById("chartMonthlyCost"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Baseline cost (DKK)", data: m.baseline_cost_dkk },
+          { label: "Cost with PV (DKK)", data: m.system_cost_dkk },
+          { label: "Savings (DKK)", data: m.savings_dkk }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: false },
+          y: { stacked: false }
+        }
+      }
+    });
+  }
+
 
   function renderSimulation(data) {
     const s = data.summary;
@@ -347,7 +484,7 @@
     }
 
     const html = `
-      <details class="section" open>
+      <details class="section">
         <summary>
           Simulation (Chosen day)
           <span class="badge">${fmt(s.savings_dkk)} DKK</span>
@@ -424,7 +561,7 @@
     }
 
     simYearEl.innerHTML = `
-      <details class="section" open>
+      <details class="section">
         <summary>
           Yearly simulation (${year})
           <span class="badge">${fmt(s.savings_dkk)} DKK</span>
@@ -587,32 +724,6 @@
       sw.style.opacity = (st.fillOpacity ?? 0.25);
 
       label.insertBefore(sw, label.firstChild);
-    });
-  }
-
-  function renderPlots(data) {
-    const day = data.series_day;
-    const year = data.series_year;
-
-    if (chartDay) chartDay.destroy();
-    if (chartYear) chartYear.destroy();
-
-    chartDay = new Chart(document.getElementById("chartDay"), {
-      type: "line",
-      data: {
-        labels: day.t,
-        datasets: [{ label: "Power (W)", data: day.power_w, pointRadius: 0 }]
-      },
-      options: { responsive: true, scales: { x: { display: false } } }
-    });
-
-    chartYear = new Chart(document.getElementById("chartYear"), {
-      type: "line",
-      data: {
-        labels: year.d,
-        datasets: [{ label: "Daily energy (kWh/day)", data: year.kwh, pointRadius: 0 }]
-      },
-      options: { responsive: true, scales: { x: { display: false } } }
     });
   }
 
@@ -944,6 +1055,7 @@
           year: year,
         });
 
+        lastYearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
         const yearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
         renderSimulationYear(yearSim);
 
@@ -962,15 +1074,24 @@
       }
     };
 
+      // Modal close button
+    document.getElementById("btnMonthlyClose").onclick = closeMonthlyModal;
 
+    // Click outside card closes modal
+    document.getElementById("monthlyModal").onclick = (e) => {
+      if (e.target.id === "monthlyModal") closeMonthlyModal();
+    };
 
-    document.getElementById("btnPlots").onclick = () => {
-      if (!lastSummary) {
-        statusEl.textContent = "Refresh summary first (so plot data exists).";
-        return;
+    // Monthly overview button
+    document.getElementById("btnMonthly").onclick = () => {
+      try {
+        renderMonthlyCharts(lastYearSim);
+        openMonthlyModal();
+        statusEl.textContent = "Monthly overview opened.";
+      } catch (err) {
+        statusEl.textContent = String(err);
+        console.error(err);
       }
-      renderPlots(lastSummary);
-      statusEl.textContent = "Plots updated.";
     };
 
   }

@@ -676,8 +676,9 @@ def api_simulate_year(
     pr: float = Query(1.0),
     tilt: float = Query(40.0),
     az: float = Query(180.0),
-    year: int = Query(2025),
 ):
+    year = 2025  # fixed for now
+
     # PV: hourly from PVGIS TMY
     tmy = _get_pvgis_tmy_irradiance_cached(round(lat, 4), round(lon, 4))
     times_local = pd.DatetimeIndex([ts.replace(year=year) for ts in tmy.index]).tz_convert(TZ)
@@ -696,12 +697,12 @@ def api_simulate_year(
     pv_df.index = pv_df.index.tz_convert("UTC")
     pv_df.index.name = "TimeUTC"
 
+    # Load consumption + prices (UTC indexed)
     load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
     price_df = simulation.read_prices(str(PRICES_PATH))
 
-    # restrict to year window (UTC)
-    start_utc = pd.Timestamp(f"{year}-01-01 00:00", tz="UTC")
-    end_utc = pd.Timestamp(f"{year+1}-01-01 00:00", tz="UTC")
+    start_utc = pd.Timestamp("2025-01-01 00:00", tz="UTC")
+    end_utc = pd.Timestamp("2026-01-01 00:00", tz="UTC")
 
     load_year = load_df.loc[start_utc:end_utc].reindex(pv_df.index)
     price_year = price_df.loc[start_utc:end_utc].reindex(pv_df.index)
@@ -712,7 +713,36 @@ def api_simulate_year(
     df_sim = simulation.simulate_no_battery(df)
     summary = simulation.compute_costs(df_sim)
 
-    return {"inputs": {"year": year}, "summary": summary}
+    # Monthly aggregates
+    monthly_kwh = df_sim[["load_kwh","pv_kwh","import_kwh","export_kwh"]].resample("MS").sum()
 
+    monthly_baseline = (df_sim["load_kwh"] * df_sim["buy_price_dkk_per_kwh"]).resample("MS").sum()
+    monthly_system = (
+        (df_sim["import_kwh"] * df_sim["buy_price_dkk_per_kwh"])
+        - (df_sim["export_kwh"] * df_sim["sell_price_dkk_per_kwh"])
+    ).resample("MS").sum()
 
+    pv_used = df_sim["pv_used_kwh"].resample("MS").sum()
+    pv_prod = df_sim["pv_kwh"].resample("MS").sum()
+    load_sum = df_sim["load_kwh"].resample("MS").sum()
+    import_sum = df_sim["import_kwh"].resample("MS").sum()
 
+    self_consumption = (pv_used / pv_prod).replace([np.inf, -np.inf], np.nan)
+    self_sufficiency = (1.0 - import_sum / load_sum).replace([np.inf, -np.inf], np.nan)
+
+    # Convert to JSON-friendly lists
+    months = [d.strftime("%Y-%m") for d in monthly_kwh.index.tz_convert("UTC")]
+    monthly = {
+        "month": months,
+        "load_kwh": monthly_kwh["load_kwh"].fillna(0).tolist(),
+        "pv_kwh": monthly_kwh["pv_kwh"].fillna(0).tolist(),
+        "import_kwh": monthly_kwh["import_kwh"].fillna(0).tolist(),
+        "export_kwh": monthly_kwh["export_kwh"].fillna(0).tolist(),
+        "baseline_cost_dkk": monthly_baseline.fillna(0).tolist(),
+        "system_cost_dkk": monthly_system.fillna(0).tolist(),
+        "savings_dkk": (monthly_baseline - monthly_system).fillna(0).tolist(),
+        "self_consumption": self_consumption.fillna(0).tolist(),
+        "self_sufficiency": self_sufficiency.fillna(0).tolist(),
+    }
+
+    return {"inputs": {"year": year}, "summary": summary, "monthly": monthly}

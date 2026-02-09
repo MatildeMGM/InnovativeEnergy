@@ -60,3 +60,4 @@ def compute_costs(df: pd.DataFrame) -> dict:
         "self_consumption_ratio": float(pv_used_sum / pv_sum) if pv_sum > 0 else None,
         "self_sufficiency": float(1.0 - import_sum / load_sum) if load_sum > 0 else None,
     }
+

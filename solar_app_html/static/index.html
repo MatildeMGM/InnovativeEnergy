@@ -288,7 +288,7 @@
   <div id="monthlyModal" class="modal" style="display:none;">
     <div class="modalCard">
       <div class="modalHeader">
-        <div style="font-weight:700;">Monthly overview (2025)</div>
+        <div style="font-weight:700;">Monthly overview (2024)</div>
         <button id="btnMonthlyClose" class="modalClose">Close</button>
       </div>
 
@@ -350,7 +350,7 @@
     </div>
 
     <button id="btnSummary">Refresh summary</button>
-    <button id="btnMonthly">Monthly overview (2025)</button>
+    <button id="btnMonthly">Monthly overview (2024)</button>
 
     <div class="hr"></div>
 
@@ -421,7 +421,12 @@
     }
 
     const m = yearSim.monthly;
-    const labels = m.month;
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    const labels = m.month.map(s => {
+      const mm = Number(String(s).split("-")[1]);  // "2024-03" -> 3
+      return monthNames[mm - 1];
+    });
 
     // Destroy existing charts
     if (chartMonthlyEnergy) chartMonthlyEnergy.destroy();
@@ -905,7 +910,7 @@
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
-    dayEl.value = "2025-06-15";
+    dayEl.value = "2024-06-15";
     const extraOverlays = {}; // name -> Leaflet layer
 
     const presetsResp = await getJSON("/api/presets");

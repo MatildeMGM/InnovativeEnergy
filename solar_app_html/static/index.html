@@ -275,8 +275,6 @@
 
     <button id="btnSummary">Refresh summary</button>
     <button id="btnPlots">Show plots</button>
-    <button id="btnSim">Run Solar simulation</button>
-
 
     <div class="hr"></div>
 
@@ -286,6 +284,8 @@
     <div id="summary">No summary yet.</div>
     <div class="hr"></div>
     <div id="simulation">No simulation yet.</div>
+    <div id="simulationYear">No yearly simulation yet.</div>
+
 
 
     <div class="hr"></div>
@@ -315,6 +315,8 @@
 
   const simBox = document.getElementById("simBox");
   const simEl = document.getElementById("simulation");
+  const simYearEl = document.getElementById("simulationYear");
+
 
 
   let PRESETS = {};
@@ -347,7 +349,7 @@
     const html = `
       <details class="section" open>
         <summary>
-          Simulation results
+          Simulation (Chosen day)
           <span class="badge">${fmt(s.savings_dkk)} DKK</span>
         </summary>
 
@@ -408,6 +410,64 @@
     simEl.innerHTML = html;
   }
 
+  function renderSimulationYear(data) {
+    const s = data.summary;
+    const year = data.inputs.year;
+
+    function fmt(x, digits = 2) {
+      if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
+      return Number(x).toFixed(digits);
+    }
+    function pct(x) {
+      if (x === null || x === undefined) return "—";
+      return (Number(x) * 100).toFixed(1) + " %";
+    }
+
+    simYearEl.innerHTML = `
+      <details class="section" open>
+        <summary>
+          Yearly simulation (${year})
+          <span class="badge">${fmt(s.savings_dkk)} DKK</span>
+        </summary>
+        <div class="body">
+          <details class="section" open>
+            <summary>Totals</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Baseline cost</div>
+                <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
+
+                <div class="k">Cost with PV</div>
+                <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
+
+                <div class="k">Savings</div>
+                <div class="v"><b>${fmt(s.savings_dkk)} DKK</b></div>
+
+                <div class="k">Load</div>
+                <div class="v">${fmt(s.load_kwh)} kWh</div>
+
+                <div class="k">PV production</div>
+                <div class="v">${fmt(s.pv_kwh)} kWh</div>
+              </div>
+            </div>
+          </details>
+
+          <details class="section" open>
+            <summary>Key ratios</summary>
+            <div class="body">
+              <div class="row2">
+                <div class="k">Self-consumption</div>
+                <div class="v">${pct(s.self_consumption_ratio)}</div>
+
+                <div class="k">Self-sufficiency</div>
+                <div class="v">${pct(s.self_sufficiency)}</div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+    `;
+  }
 
 
   function setSelected(lat, lon) {
@@ -845,7 +905,7 @@
         return;
       }
 
-      statusEl.textContent = "Computing summary…";
+      statusEl.textContent = "Computing all results…";
 
       const params = new URLSearchParams({
         lat: selected.lat,
@@ -858,11 +918,51 @@
         freq: freqEl.value,
       });
 
-      const data = await getJSON(`/api/summary?${params.toString()}`);
-      lastSummary = data;
-      renderSummary(data);
-      statusEl.textContent = "Summary updated.";
+      // show some progress in the UI (optional but nice)
+      if (typeof simEl !== "undefined" && simEl) simEl.innerHTML = "<div class='small'>Running daily simulation…</div>";
+      if (typeof simYearEl !== "undefined" && simYearEl) simYearEl.innerHTML = "<div class='small'>Running yearly simulation…</div>";
+
+      try {
+        // 1) PV summary
+        const summary = await getJSON(`/api/summary?${params.toString()}`);
+        lastSummary = summary;
+        renderSummary(summary);
+
+        // 2) Day simulation
+        const daySim = await getJSON(`/api/simulate_day?${params.toString()}`);
+        renderSimulation(daySim);
+
+        // 3) Year simulation
+        const year = String(dayEl.value).slice(0, 4);
+        const yearParams = new URLSearchParams({
+          lat: selected.lat,
+          lon: selected.lon,
+          kwp: kwpEl.value,
+          pr: prEl.value,
+          tilt: tiltEl.value,
+          az: azEl.value,
+          year: year,
+        });
+
+        const yearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
+        renderSimulationYear(yearSim);
+
+        statusEl.textContent = "All results updated.";
+      } catch (err) {
+        statusEl.textContent = "Error while computing results.";
+        console.error(err);
+
+        // show errors in the boxes if present
+        if (typeof simEl !== "undefined" && simEl) {
+          simEl.innerHTML = "<pre class='small'>Error:\n" + escapeHtml(String(err)) + "</pre>";
+        }
+        if (typeof simYearEl !== "undefined" && simYearEl) {
+          simYearEl.innerHTML = "<pre class='small'>Error:\n" + escapeHtml(String(err)) + "</pre>";
+        }
+      }
     };
+
+
 
     document.getElementById("btnPlots").onclick = () => {
       if (!lastSummary) {
@@ -871,37 +971,6 @@
       }
       renderPlots(lastSummary);
       statusEl.textContent = "Plots updated.";
-    };
-
-    document.getElementById("btnSim").onclick = async () => {
-      if (!selected) {
-        statusEl.textContent = "Click map to set location first.";
-        return;
-      }
-
-      statusEl.textContent = "Running simulation…";
-      simEl.innerHTML = "<div class='small'>Running simulation…</div>";
-
-      const params = new URLSearchParams({
-        lat: selected.lat,
-        lon: selected.lon,
-        kwp: kwpEl.value,
-        pr: prEl.value,
-        tilt: tiltEl.value,
-        az: azEl.value,
-        day: dayEl.value,
-        freq: freqEl.value,
-      });
-
-      try {
-        const data = await getJSON(`/api/simulate_day?${params.toString()}`);
-        renderSimulation(data);
-        statusEl.textContent = "Simulation finished.";
-      } catch (err) {
-        simEl.innerHTML = "<pre class='small'>Simulation error:\n" + escapeHtml(String(err)) + "</pre>";
-        statusEl.textContent = "Simulation failed. See output box.";
-        console.error(err);
-      }
     };
 
   }

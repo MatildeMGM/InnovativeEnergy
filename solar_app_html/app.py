@@ -668,3 +668,51 @@ def api_simulate_day(
         },
     }
 
+@app.get("/api/simulate_year")
+def api_simulate_year(
+    lat: float,
+    lon: float,
+    kwp: float = Query(1.0),
+    pr: float = Query(1.0),
+    tilt: float = Query(40.0),
+    az: float = Query(180.0),
+    year: int = Query(2025),
+):
+    # PV: hourly from PVGIS TMY
+    tmy = _get_pvgis_tmy_irradiance_cached(round(lat, 4), round(lon, 4))
+    times_local = pd.DatetimeIndex([ts.replace(year=year) for ts in tmy.index]).tz_convert(TZ)
+
+    df_pv_local = _pv_timeseries_from_irradiance(
+        lat, lon, kwp, tilt, az,
+        times=times_local,
+        ghi=tmy["ghi"].to_numpy(),
+        dni=tmy["dni"].to_numpy(),
+        dhi=tmy["dhi"].to_numpy(),
+        pr=pr,
+    )
+
+    pv_kwh_local = simulation.energy_kwh_from_power(df_pv_local["power_w"])
+    pv_df = pd.DataFrame({"pv_kwh": pv_kwh_local})
+    pv_df.index = pv_df.index.tz_convert("UTC")
+    pv_df.index.name = "TimeUTC"
+
+    load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
+    price_df = simulation.read_prices(str(PRICES_PATH))
+
+    # restrict to year window (UTC)
+    start_utc = pd.Timestamp(f"{year}-01-01 00:00", tz="UTC")
+    end_utc = pd.Timestamp(f"{year+1}-01-01 00:00", tz="UTC")
+
+    load_year = load_df.loc[start_utc:end_utc].reindex(pv_df.index)
+    price_year = price_df.loc[start_utc:end_utc].reindex(pv_df.index)
+
+    df = load_year.join(price_year, how="inner").join(pv_df, how="left")
+    df["pv_kwh"] = df["pv_kwh"].fillna(0.0)
+
+    df_sim = simulation.simulate_no_battery(df)
+    summary = simulation.compute_costs(df_sim)
+
+    return {"inputs": {"year": year}, "summary": summary}
+
+
+

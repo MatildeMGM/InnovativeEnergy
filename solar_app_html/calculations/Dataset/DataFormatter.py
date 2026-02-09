@@ -215,7 +215,7 @@ df["sell_price_dkk_per_kwh"] = df["price_dkk_per_kwh"]
 # df.to_csv("elspot_DK1_with_total_prices.csv")
 
 # print(df[["price_dkk_per_kwh", "buy_price_dkk_per_kwh"]].head())
-# print("Average buy price:", df["buy_price_dkk_per_kwh"].mean())
+print("Average buy price:", df["buy_price_dkk_per_kwh"].mean())
 
 #%% _____________________ PRIS COMPARISON PLOTS _____________________
 # PRICES COMPARISON PLOTS

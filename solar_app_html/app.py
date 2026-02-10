@@ -624,6 +624,16 @@ def api_simulate_day(
     az: float = Query(180.0),
     day: str = Query(...),
     freq: str = Query("1h"),
+
+    # Battery params
+    battery_kwh: float = Query(0.0),
+    soc_init: float = Query(0.5),
+    soc_min: float = Query(0.1),
+    soc_max: float = Query(0.9),
+    p_charge_kw: float | None = Query(None),
+    p_discharge_kw: float | None = Query(None),
+    eta_charge: float = Query(0.95),
+    eta_discharge: float = Query(0.95),
 ):
     # PV power series (local TZ)
     df_pv = daily_profile(lat, lon, kwp, tilt, az, day, freq, pr=pr)
@@ -651,7 +661,21 @@ def api_simulate_day(
     df = load_day.join(price_day, how="inner").join(pv_df, how="left")
     df["pv_kwh"] = df["pv_kwh"].fillna(0.0)
 
-    df_sim = simulation.simulate_no_battery(df)
+    if battery_kwh > 0:
+        df_sim = simulation.simulate_greedy_battery(
+            df,
+            capacity_kwh=battery_kwh,
+            soc_init=soc_init,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            p_charge_kw=p_charge_kw,
+            p_discharge_kw=p_discharge_kw,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+        )
+    else:
+        df_sim = simulation.simulate_no_battery(df)
+
     summary = simulation.compute_costs(df_sim)
 
     return {
@@ -676,6 +700,16 @@ def api_simulate_year(
     pr: float = Query(1.0),
     tilt: float = Query(40.0),
     az: float = Query(180.0),
+
+    # Battery params
+    battery_kwh: float = Query(0.0),
+    soc_init: float = Query(0.5),
+    soc_min: float = Query(0.1),
+    soc_max: float = Query(0.9),
+    p_charge_kw: float | None = Query(None),
+    p_discharge_kw: float | None = Query(None),
+    eta_charge: float = Query(0.95),
+    eta_discharge: float = Query(0.95),
 ):
     year = 2024  # fixed for now
 
@@ -710,7 +744,21 @@ def api_simulate_year(
     df = load_year.join(price_year, how="inner").join(pv_df, how="left")
     df["pv_kwh"] = df["pv_kwh"].fillna(0.0)
 
-    df_sim = simulation.simulate_no_battery(df)
+    if battery_kwh > 0:
+        df_sim = simulation.simulate_greedy_battery(
+            df,
+            capacity_kwh=battery_kwh,
+            soc_init=soc_init,
+            soc_min=soc_min,
+            soc_max=soc_max,
+            p_charge_kw=p_charge_kw,
+            p_discharge_kw=p_discharge_kw,
+            eta_charge=eta_charge,
+            eta_discharge=eta_discharge,
+        )
+    else:
+        df_sim = simulation.simulate_no_battery(df)
+
     summary = simulation.compute_costs(df_sim)
 
     # Monthly aggregates

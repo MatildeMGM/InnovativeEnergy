@@ -40,6 +40,8 @@ FREQ_OPTIONS = {
     "5 min": "5min",
 }
 
+BASE_ANNUAL_KWH = 4200.0
+
 LAYERS_DIR = Path(__file__).resolve().parent / "layers"
 LAYERS_CONFIG_PATH = LAYERS_DIR / "layers_config.json"
 
@@ -234,6 +236,21 @@ def yearly_daily_energy(lat, lon, kwp, tilt_deg, azimuth_deg, year: int, pr: flo
     e_wh = _energy_wh_series_from_power(df["power_w"])
     return e_wh.resample("1D").sum()
 
+def scale_load_to_annual(df_load: pd.DataFrame, annual_kwh: float) -> pd.DataFrame:
+    """
+    df_load must contain 'load_kwh'. Assumes the loaded profile sums to BASE_ANNUAL_KWH
+    over a full year (your CSV is already scaled to 4200).
+    """
+    out = df_load.copy()
+    annual_kwh = float(annual_kwh)
+
+    if annual_kwh <= 0:
+        out["load_kwh"] = 0.0
+        return out
+
+    scale = annual_kwh / BASE_ANNUAL_KWH
+    out["load_kwh"] = out["load_kwh"] * scale
+    return out
 
 # ----------------------------
 # Geo / plan helpers (mirrors MapAndSolar_V2.py)
@@ -381,10 +398,6 @@ def index():
 @app.get("/api/center")
 def api_center():
     return {"lat": center_lat, "lon": center_lon}
-
-@app.get("/api/presets")
-def api_presets():
-    return {"presets": PANEL_PRESETS, "freq_options": FREQ_OPTIONS}
 
 @app.get("/api/bornholm")
 def api_bornholm():
@@ -624,6 +637,7 @@ def api_simulate_day(
     az: float = Query(180.0),
     day: str = Query(...),
     freq: str = Query("1h"),
+    annual_kwh: float = Query(4200.0),
 
     # Battery params
     battery_kwh: float = Query(0.0),
@@ -652,6 +666,7 @@ def api_simulate_day(
 
     # Load consumption + prices (UTC indexed)
     load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
+    load_df = scale_load_to_annual(load_df, annual_kwh)
     price_df = simulation.read_prices(str(PRICES_PATH))
 
     load_day = load_df.loc[start_utc:end_utc]
@@ -700,6 +715,7 @@ def api_simulate_year(
     pr: float = Query(1.0),
     tilt: float = Query(40.0),
     az: float = Query(180.0),
+    annual_kwh: float = Query(4200.0),
 
     # Battery params
     battery_kwh: float = Query(0.0),
@@ -733,6 +749,7 @@ def api_simulate_year(
 
     # Load consumption + prices (UTC indexed)
     load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
+    load_df = scale_load_to_annual(load_df, annual_kwh)
     price_df = simulation.read_prices(str(PRICES_PATH))
 
     start_utc = pd.Timestamp("2024-01-01 00:00", tz="UTC")

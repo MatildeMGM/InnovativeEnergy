@@ -308,35 +308,42 @@
     </div>
   </div>  
   <div id="side">
-    <h1>PV estimator</h1>
+    <h1>Inputs</h1>
 
     <div class="row">
-      <label>Preset</label>
-      <select id="preset"></select>
-    </div>
-
-    <div class="row">
-      <label>PV size (kWp)</label>
-      <input id="kwp" type="number" step="0.1" value="1.0" min="0">
-    </div>
-
-    <div class="row">
-      <label>Performance ratio PR (optional)</label>
-      <input id="pr" type="number" step="0.01" value="1.00" min="0" max="1.2">
-    </div>
-
-    <div class="row">
-      <label>Tilt (°)</label>
-      <input id="tilt" type="number" step="1" value="40">
-    </div>
-
-    <div class="row">
-      <label>Azimuth (°)</label>
-      <input id="az" type="number" step="1" value="180">
+      <label>Yearly consumption (kWh/year)</label>
+      <input id="annual_kwh" type="number" value="4200" step="100" min="0">
     </div>
 
     <details class="section">
-      <summary>Battery (optional)</summary>
+      <summary>PV settings</summary>
+      <div class="body">
+
+        <div class="row">
+          <label>PV size (kWp)</label>
+          <input id="kwp" type="number" step="0.1" value="1.0" min="0">
+        </div>
+
+        <div class="row">
+          <label>Performance ratio PR</label>
+          <input id="pr" type="number" step="0.01" value="1.00" min="0" max="1.2">
+        </div>
+
+        <div class="row">
+          <label>Tilt (°)</label>
+          <input id="tilt" type="number" step="1" value="40">
+        </div>
+
+        <div class="row">
+          <label>Azimuth (°)</label>
+          <input id="az" type="number" step="1" value="180">
+        </div>
+
+      </div>
+    </details>
+
+    <details class="section">
+      <summary>Battery settings</summary>
       <div class="body">
 
         <div class="row">
@@ -345,17 +352,17 @@
         </div>
 
         <div class="row">
-          <label>Initial SoC (0–1)</label>
+          <label>Initial SoC (0-1)</label>
           <input id="soc_init" type="number" step="0.05" value="0.5" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>SoC min (0–1)</label>
+          <label>SoC min (0-1)</label>
           <input id="soc_min" type="number" step="0.05" value="0.1" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>SoC max (0–1)</label>
+          <label>SoC max (0-1)</label>
           <input id="soc_max" type="number" step="0.05" value="0.9" min="0" max="1">
         </div>
 
@@ -426,13 +433,13 @@
   const coord = document.getElementById("coord");
   const statusEl = document.getElementById("status");
 
-  const presetEl = document.getElementById("preset");
   const kwpEl = document.getElementById("kwp");
   const prEl = document.getElementById("pr");
   const tiltEl = document.getElementById("tilt");
   const azEl = document.getElementById("az");
   const dayEl = document.getElementById("day");
   const freqEl = document.getElementById("freq");
+  const annualKwhEl = document.getElementById("annual_kwh");
 
     //Simulering Solpanel
   const simBox = document.getElementById("simBox");
@@ -449,9 +456,6 @@
   const etaCEl = document.getElementById("eta_c");
   const etaDEl = document.getElementById("eta_d");
 
-
-
-  let PRESETS = {};
   let selected = null;
   let marker = null;
 
@@ -692,17 +696,6 @@
 
     if (marker) {
       marker.setLatLng([lat, lon]);
-    }
-  }
-
-  function applyPreset(name) {
-    const kwp = PRESETS[name];
-
-    if (name !== "Custom") {
-      kwpEl.value = kwp;
-      kwpEl.disabled = true;
-    } else {
-      kwpEl.disabled = false;
     }
   }
 
@@ -985,22 +978,6 @@
     const dd = String(today.getDate()).padStart(2, "0");
     dayEl.value = "2024-06-15";
     const extraOverlays = {}; // name -> Leaflet layer
-
-    const presetsResp = await getJSON("/api/presets");
-    PRESETS = presetsResp.presets;
-
-    presetEl.innerHTML = "";
-    for (const name of Object.keys(PRESETS)) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      presetEl.appendChild(opt);
-    }
-    presetEl.value = "1 kWp";
-    applyPreset(presetEl.value);
-
-    presetEl.addEventListener("change", () => applyPreset(presetEl.value));
-
     const center = await getJSON("/api/center");
 
     // Map
@@ -1105,6 +1082,7 @@
         az: azEl.value,
         day: dayEl.value,
         freq: freqEl.value,
+        annual_kwh: annualKwhEl.value,
       });
 
       addBatteryParams(params);
@@ -1133,6 +1111,7 @@
           tilt: tiltEl.value,
           az: azEl.value,
           year: year,
+          annual_kwh: annualKwhEl.value,
         });
 
         addBatteryParams(yearParams);

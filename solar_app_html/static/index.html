@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!doctype html>
 <html>
 <head>
@@ -226,6 +227,54 @@
       vertical-align:middle;
     }
 
+    /* --- Layers control styling --- */
+    .leaflet-control-layers {
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* Title row inside the control */
+    .layers-title {
+      font-weight: 700;
+      padding: 8px 10px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #e6e6e6;
+    }
+
+    /* Make each overlay line a clean 3-column row: toggle | name | swatch */
+    .leaflet-control-layers-overlays label {
+      display: grid;
+      grid-template-columns: 18px 1fr 18px;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    /* Keep checkbox aligned and not stretched */
+    .leaflet-control-layers-overlays input[type="checkbox"] {
+      margin: 0;
+      justify-self: start;
+    }
+
+    /* Ensure the name doesn't collide with swatch */
+    .leaflet-control-layers-overlays label .layer-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Put swatch on the right */
+    .layer-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 2px solid #666;
+      margin: 0;
+      justify-self: end;
+    }
+
     /* Modal */
     .modal {
       position: fixed;
@@ -278,7 +327,103 @@
       .modalGrid { grid-template-columns: 1fr; }
     }
 
+    /* --- Force base-layer radios + text onto ONE line --- */
+    .leaflet-control-layers .leaflet-control-layers-base label {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px;
+      padding: 6px 10px;
+      margin: 0;
+      white-space: nowrap;
+    }
 
+    /* Leaflet uses a span for the label text - ensure it doesn't wrap under the radio */
+    .leaflet-control-layers .leaflet-control-layers-base label span {
+      display: inline-block !important;
+      line-height: 1.2;
+    }
+
+    /* Kill any weird default offsets */
+    .leaflet-control-layers .leaflet-control-layers-base input[type="radio"] {
+      margin: 0 !important;
+      position: static !important;
+      top: auto !important;
+      vertical-align: middle !important;
+      flex: 0 0 auto;
+    }
+
+    /* ===== Leaflet layers control: consistent left alignment ===== */
+
+    /* Leaflet wraps base+overlays inside this list element */
+    .leaflet-control-layers .leaflet-control-layers-list {
+      padding: 0 !important;     /* remove Leaflet's default indent */
+      margin: 0 !important;
+    }
+
+    /* Remove any extra padding on the section containers */
+    .leaflet-control-layers .leaflet-control-layers-base,
+    .leaflet-control-layers .leaflet-control-layers-overlays {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    /* Apply the SAME row padding to both base + overlays */
+    .leaflet-control-layers .leaflet-control-layers-base label,
+    .leaflet-control-layers .leaflet-control-layers-overlays label {
+      padding: 6px 10px !important;  /* unified left/right padding */
+      margin: 0 !important;
+    }
+
+    /* Base layer (radio): force one-line row with proper alignment */
+    .leaflet-control-layers .leaflet-control-layers-base label {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      white-space: nowrap;
+    }
+
+    .leaflet-control-layers .leaflet-control-layers-base input[type="radio"] {
+      margin: 0 !important;
+      flex: 0 0 auto;
+    }
+
+    .leaflet-control-layers .leaflet-control-layers-base label span {
+      display: inline-block !important;
+    }
+
+    /* Overlay rows: keep your grid, but ensure padding is consistent */
+    .leaflet-control-layers .leaflet-control-layers-overlays label {
+      display: grid !important;
+      grid-template-columns: 18px 1fr 18px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ===== Fix Leaflet layers control being affected by global form styles ===== */
+    .leaflet-control-layers input,
+    .leaflet-control-layers select {
+      width: auto !important;
+      padding: 0 !important;
+      box-sizing: content-box !important;
+    }
+
+    .leaflet-control-layers label {
+      margin-bottom: 0 !important; /* your global label rule adds spacing */
+    }
+
+    /* Base layers: spacing between radio and text (needs span wrapper from JS below) */
+    .leaflet-control-layers .leaflet-control-layers-base label {
+      display: flex !important;
+      align-items: center !important;
+      padding: 6px 10px !important;
+      margin: 0 !important;
+    }
+
+    .leaflet-control-layers .leaflet-control-layers-base label span.layer-name {
+      margin-left: 8px !important; /* match overlay "gap: 8px" */
+    }
+
+    
   </style>
 </head>
 
@@ -779,22 +924,61 @@
 
   function applyLayerSwatches(layerControl, styleByDisplayName) {
     const root = layerControl.getContainer();
-    const labels = root.querySelectorAll(".leaflet-control-layers-overlays label");
 
-    labels.forEach(label => {
-      const text = label.textContent.trim(); // displayed name
-      const st = styleByDisplayName[text];
+    // Add a title once
+    if (!root.querySelector(".layers-title")) {
+      const title = document.createElement("div");
+      title.className = "layers-title";
+      title.textContent = "Layers";
+      root.insertBefore(title, root.firstChild);
+    }
+
+    // ---- 1) FIX BASE LAYERS: wrap text node into a span so spacing works ----
+    const baseLabels = root.querySelectorAll(".leaflet-control-layers-base label");
+    baseLabels.forEach(label => {
+      const input = label.querySelector('input[type="radio"]');
+      if (!input) return;
+
+      // If already wrapped, do nothing
+      if (label.querySelector("span.layer-name")) return;
+
+      const name = label.textContent.trim(); // capture text BEFORE changing DOM
+
+      const span = document.createElement("span");
+      span.className = "layer-name";
+      span.textContent = name;
+
+      // Replace label contents with: [radio][span]
+      label.replaceChildren(input, span);
+    });
+
+    // ---- 2) OVERLAYS: add swatches + ensure name span class ----
+    const overlayLabels = root.querySelectorAll(".leaflet-control-layers-overlays label");
+    overlayLabels.forEach(label => {
+      const input = label.querySelector('input[type="checkbox"]');
+      const span = label.querySelector("span"); // Leaflet creates span for overlays
+      if (!input || !span) return;
+
+      const name = span.textContent.trim();
+      const st = styleByDisplayName[name];
       if (!st) return;
 
-      if (label.querySelector(".layer-swatch")) return;
+      span.classList.add("layer-name");
 
-      const sw = document.createElement("span");
-      sw.className = "layer-swatch";
+      let sw = label.querySelector(".layer-swatch");
+      if (!sw) {
+        sw = document.createElement("span");
+        sw.className = "layer-swatch";
+        label.appendChild(sw);
+      }
+
       sw.style.borderColor = st.color || "#666";
       sw.style.background = st.fillColor || st.color || "#999";
       sw.style.opacity = (st.fillOpacity ?? 0.25);
 
-      label.insertBefore(sw, label.firstChild);
+      // Ensure order: input | name | swatch
+      label.insertBefore(input, label.firstChild);
+      label.insertBefore(span, input.nextSibling);
     });
   }
 
@@ -982,12 +1166,32 @@
 
     // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
-    const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      minZoom: 10,
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    });
+
+    // ----- Base layers -----
+
+    // OpenStreetMap
+    const osm = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        minZoom: 10,
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    );
+
+    // Esri satellite
+    const esriSat = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        minZoom: 10,
+        maxZoom: 19,
+        attribution: "Tiles © Esri"
+      }
+    );
+
+    // Default layer shown when map loads
     osm.addTo(map);
+
 
     // Marker visible immediately (like original)
     marker = L.marker([center.lat, center.lon]).addTo(map);
@@ -1057,12 +1261,15 @@
     });
 
     // ----- Layer control (built from config-loaded overlays) -----
-    const baseLayers = { "OpenStreetMap": osm };
+    const baseLayers = {
+      "OpenStreetMap": osm,
+      "Satellite (Esri)": esriSat
+    };
+
     const layerControl = L.control.layers(baseLayers, overlays, { collapsed: false }).addTo(map);
 
     // Add swatches once (must happen AFTER control is added)
     setTimeout(() => applyLayerSwatches(layerControl, styleByDisplayName), 0);
-
 
     // Buttons
     document.getElementById("btnSummary").onclick = async () => {

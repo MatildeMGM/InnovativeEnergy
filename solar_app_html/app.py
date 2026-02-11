@@ -1,3 +1,5 @@
+# app.py
+
 from __future__ import annotations
 from functools import lru_cache
 from fastapi import FastAPI, Query
@@ -16,10 +18,6 @@ import numpy as np
 import math
 from pathlib import Path
 import simulation
-
-
-
-
 
 # ----------------------------
 # Base settings (same as original)

@@ -32,12 +32,6 @@ PANEL_PRESETS = {
     "Custom": 1.0,
 }
 
-FREQ_OPTIONS = {
-    "Hourly": "1h",
-    "15 min": "15min",
-    "5 min": "5min",
-}
-
 BASE_ANNUAL_KWH = 4200.0
 
 LAYERS_DIR = Path(__file__).resolve().parent / "layers"
@@ -332,6 +326,22 @@ def find_plans_at_point(planer_query: gpd.GeoDataFrame, lat: float, lon: float) 
     return hits
 
 # ----------------------------
+# TIME AXIS VALIDATION HELPER
+# ----------------------------
+def _assert_utc_index(df: pd.DataFrame, name: str) -> None:
+    idx = df.index
+    if not isinstance(idx, pd.DatetimeIndex):
+        raise RuntimeError(f"{name}: index is not DatetimeIndex (got {type(idx)}).")
+    if idx.tz is None:
+        raise RuntimeError(f"{name}: index is timezone-naive (tz=None). Must be UTC-aware.")
+    if str(idx.tz) != "UTC":
+        raise RuntimeError(f"{name}: index tz is {idx.tz}, expected UTC.")
+    if not idx.is_monotonic_increasing:
+        raise RuntimeError(f"{name}: index is not sorted ascending.")
+
+    print(f"{name}: OK | {idx.min()} → {idx.max()} | rows={len(df)}")
+
+# ----------------------------
 # Load data once (like notebook script)
 # ----------------------------
 gdf = gpd.read_file(LAYERS_DIR / "municipalities.geojson").to_crs(4326)
@@ -521,57 +531,50 @@ def api_summary(
     lat: float,
     lon: float,
 
-    # New style
-    kwp: float | None = Query(None),
+    kwp: float = Query(1.0),
     pr: float = Query(1.0),
-
-    # Legacy style (keep frontend working)
-    area_m2: float | None = Query(None),
-    eff: float | None = Query(None),
 
     tilt: float = Query(40.0),
     az: float = Query(180.0),
-    day: str = Query(...),
-    freq: str = Query("1h"),
+
+    # optional year (defaults to 2025 to match your dataset)
+    year: int = Query(2025),
 ):
-    if kwp is None:
-        if area_m2 is None or eff is None:
-            # final fallback (prevents crash if frontend sends neither)
-            area_m2 = 10.0 if area_m2 is None else area_m2
-            eff = 0.20 if eff is None else eff
-        kwp = kwp_from_area_eff(area_m2, eff)
-
-    # Day: clear-sky
-    df_24h = daily_profile(lat, lon, kwp, tilt, az, day, freq, pr=pr)
-    e_day_kwh = float(_energy_wh_series_from_power(df_24h["power_w"]).sum() / 1000.0)
-
-    peak_power_w = float(df_24h["power_w"].max())
-    peak_poa_wm2 = float(df_24h["poa_global"].max())
-
-    # Year: TMY/PVGIS
-    year = int(pd.Timestamp(day).year)
-    daily_wh = yearly_daily_energy(lat, lon, kwp, tilt, az, year, pr=pr)
+    # Year: TMY/PVGIS (daily energy)
+    daily_wh = yearly_daily_energy(lat, lon, kwp, tilt, az, int(year), pr=pr)
     total_year_kwh = float(daily_wh.sum() / 1000.0)
 
-    # Plan lookup (projected/sindex, same as original)
+    # Peak values (hourly PV power from TMY irradiance)
+    tmy = _get_pvgis_tmy_irradiance_cached(round(lat, 4), round(lon, 4))
+    times = pd.DatetimeIndex([ts.replace(year=int(year)) for ts in tmy.index]).tz_convert(TZ)
+
+    df_year = _pv_timeseries_from_irradiance(
+        lat, lon, kwp, tilt, az,
+        times=times,
+        ghi=tmy["ghi"].to_numpy(),
+        dni=tmy["dni"].to_numpy(),
+        dhi=tmy["dhi"].to_numpy(),
+        pr=pr,
+    )
+
+    peak_power_w = float(df_year["power_w"].max())
+    peak_poa_wm2 = float(df_year["poa_global"].max())
+
+    # Plan lookup
     hits = find_plans_at_point(planer_query, lat, lon)
 
     plans_data = []
     if not hits.empty:
         for _, row in hits.iterrows():
             d = {}
-
-            # Collect plan fields
             for c in PLAN_SUMMARY_FIELDS:
                 if c in row.index and c != "geometry":
                     d[c] = _json_safe(row[c])
 
-            # Compute planid for joining (prefer doklink extraction)
             planid_int = None
             if d.get("doklink"):
                 planid_int = _extract_planid_from_doklink(str(d["doklink"]))
 
-            # Fallbacks if doklink missing
             if planid_int is None:
                 for key in ("planid", "plan_id", "id"):
                     val = d.get(key)
@@ -582,7 +585,6 @@ def api_summary(
                     except (TypeError, ValueError):
                         pass
 
-            # Attach CSV details
             if planid_int is not None:
                 details = PLAN_DETAILS_BY_ID.get(planid_int)
                 if details:
@@ -592,117 +594,25 @@ def api_summary(
 
     plan_data = plans_data if plans_data else None
 
-
-
-    # Series for plots
-    series_day = {
-        "t": [t.isoformat() for t in df_24h.index],
-        "power_w": df_24h["power_w"].tolist(),
-    }
     series_year = {
         "d": [d.date().isoformat() for d in daily_wh.index],
         "kwh": (daily_wh / 1000.0).tolist(),
     }
 
     return {
-        "location": {"lat": lat, "lon": lon},
+        "location": {"lat": float(lat), "lon": float(lon)},  # <-- IMPORTANT
         "inputs": {
             "kwp": float(kwp),
             "pr": float(pr),
-            "area_m2": None if area_m2 is None else float(area_m2),
-            "eff": None if eff is None else float(eff),
-            "tilt": tilt, "az": az,
-            "day": day, "freq": freq,
+            "tilt": float(tilt),
+            "az": float(az),
+            "year": int(year),
         },
-
         "peak_poa_wm2": peak_poa_wm2,
         "peak_power_w": peak_power_w,
-        "energy_day_kwh_clear_sky": e_day_kwh,
-        "year": year,
         "energy_year_kwh_tmy": total_year_kwh,
         "plan": plan_data,
-        "series_day": series_day,
         "series_year": series_year,
-    }
-
-@app.get("/api/simulate_day")
-def api_simulate_day(
-    lat: float,
-    lon: float,
-    kwp: float = Query(1.0),
-    pr: float = Query(1.0),
-    tilt: float = Query(40.0),
-    az: float = Query(180.0),
-    day: str = Query(...),
-    freq: str = Query("1h"),
-    annual_kwh: float = Query(4200.0),
-
-    # Battery params
-    battery_kwh: float = Query(0.0),
-    soc_init: float = Query(0.5),
-    soc_min: float = Query(0.1),
-    soc_max: float = Query(0.9),
-    p_charge_kw: float | None = Query(None),
-    p_discharge_kw: float | None = Query(None),
-    eta_charge: float = Query(0.95),
-    eta_discharge: float = Query(0.95),
-):
-    # PV power series (local TZ)
-    df_pv = daily_profile(lat, lon, kwp, tilt, az, day, freq, pr=pr)
-
-    # Convert to pv_kwh per interval, then convert index to UTC for joining
-    pv_kwh_local = simulation.energy_kwh_from_power(df_pv["power_w"])
-    pv_df = pd.DataFrame({"pv_kwh": pv_kwh_local})
-    pv_df.index = pv_df.index.tz_convert("UTC")
-    pv_df.index.name = "TimeUTC"
-
-    # Interpret "day" as DK local day and convert to UTC window
-    start_local = pd.Timestamp(day).tz_localize(TZ)
-    end_local = start_local + pd.Timedelta(days=1)
-    start_utc = start_local.tz_convert("UTC")
-    end_utc = end_local.tz_convert("UTC")
-
-    # Load consumption + prices (UTC indexed)
-    load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
-    load_df = scale_load_to_annual(load_df, annual_kwh)
-    price_df = simulation.read_prices(str(PRICES_PATH))
-
-    load_day = load_df.loc[start_utc:end_utc]
-    price_day = price_df.loc[start_utc:end_utc]
-
-    # Align strictly on timestamps
-    df = load_day.join(price_day, how="inner").join(pv_df, how="left")
-    df["pv_kwh"] = df["pv_kwh"].fillna(0.0)
-
-    if battery_kwh > 0:
-        df_sim = simulation.simulate_greedy_battery(
-            df,
-            capacity_kwh=battery_kwh,
-            soc_init=soc_init,
-            soc_min=soc_min,
-            soc_max=soc_max,
-            p_charge_kw=p_charge_kw,
-            p_discharge_kw=p_discharge_kw,
-            eta_charge=eta_charge,
-            eta_discharge=eta_discharge,
-        )
-    else:
-        df_sim = simulation.simulate_no_battery(df)
-
-    summary = simulation.compute_costs(df_sim)
-
-    return {
-        "inputs": {"day": day, "freq": freq},
-        "summary": summary,
-        "series": {
-            "t": [t.isoformat() for t in df_sim.index],
-            "load_kwh": df_sim["load_kwh"].tolist(),
-            "pv_kwh": df_sim["pv_kwh"].tolist(),
-            "import_kwh": df_sim["import_kwh"].tolist(),
-            "export_kwh": df_sim["export_kwh"].tolist(),
-            "buy_price": df_sim["buy_price_dkk_per_kwh"].tolist(),
-            "sell_price": df_sim["sell_price_dkk_per_kwh"].tolist(),
-        },
     }
 
 @app.get("/api/simulate_year")
@@ -714,6 +624,7 @@ def api_simulate_year(
     tilt: float = Query(40.0),
     az: float = Query(180.0),
     annual_kwh: float = Query(4200.0),
+    year: int = Query(2025),
 
     # Battery params
     battery_kwh: float = Query(0.0),
@@ -725,7 +636,6 @@ def api_simulate_year(
     eta_charge: float = Query(0.95),
     eta_discharge: float = Query(0.95),
 ):
-    year = 2025  # fixed for now
 
     # PV: hourly from PVGIS TMY
     tmy = _get_pvgis_tmy_irradiance_cached(round(lat, 4), round(lon, 4))
@@ -743,18 +653,26 @@ def api_simulate_year(
     pv_kwh_local = simulation.energy_kwh_from_power(df_pv_local["power_w"])
     pv_df = pd.DataFrame({"pv_kwh": pv_kwh_local})
     pv_df.index = pv_df.index.tz_convert("UTC")
+    pv_df = pv_df.sort_index()  # <-- ADD THIS
     pv_df.index.name = "TimeUTC"
+    _assert_utc_index(pv_df, "PV_YEAR")
 
     # Load consumption + prices (UTC indexed)
     load_df = simulation.read_consumption_scaled(str(CONSUMPTION_PATH))
     load_df = scale_load_to_annual(load_df, annual_kwh)
     price_df = simulation.read_prices(str(PRICES_PATH))
 
+    _assert_utc_index(load_df, "LOAD_YEAR")
+    _assert_utc_index(price_df, "PRICE_YEAR")
+
     start_utc = pd.Timestamp("2025-01-01 00:00").tz_localize(TZ).tz_convert("UTC")
     end_utc   = pd.Timestamp("2026-01-01 00:00").tz_localize(TZ).tz_convert("UTC")
 
-    load_year = load_df.loc[start_utc:end_utc].reindex(pv_df.index)
-    price_year = price_df.loc[start_utc:end_utc].reindex(pv_df.index)
+    mask = (load_df.index >= start_utc) & (load_df.index < end_utc)
+    load_year = load_df.loc[mask].reindex(pv_df.index)
+
+    maskp = (price_df.index >= start_utc) & (price_df.index < end_utc)
+    price_year = price_df.loc[maskp].reindex(pv_df.index)
 
     df = load_year.join(price_year, how="inner").join(pv_df, how="left")
     df["pv_kwh"] = df["pv_kwh"].fillna(0.0)

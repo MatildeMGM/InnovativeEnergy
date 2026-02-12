@@ -383,15 +383,22 @@
       <input id="annual_kwh" type="number" value="4200" step="100" min="0">
     </div>
 
+    <div class="row">
+      <label>PV size (kWp)</label>
+      <input id="kwp" type="number" step="0.1" value="1.0" min="0">
+    </div>
+
+    <div class="row">
+      <label>Battery size (kWh) (0 = off)</label>
+      <input id="batt_kwh" type="number" step="0.5" value="0" min="0">
+    </div>
+
     <details class="section">
-      <summary>PV settings</summary>
+      <summary>Advanced settings</summary>
       <div class="body">
 
-        <div class="row">
-          <label>PV size (kWp)</label>
-          <input id="kwp" type="number" step="0.1" value="1.0" min="0">
-        </div>
-
+        <!-- PV advanced -->
+        <h4>PV Advanced</h4>
         <div class="row">
           <label>Performance ratio PR</label>
           <input id="pr" type="number" step="0.01" value="0.75" min="0" max="1.2">
@@ -407,18 +414,10 @@
           <input id="az" type="number" step="1" value="180">
         </div>
 
-      </div>
-    </details>
+        <div class="hr"></div>
 
-    <details class="section">
-      <summary>Battery settings</summary>
-      <div class="body">
-
-        <div class="row">
-          <label>Battery size (kWh) (0 = off)</label>
-          <input id="batt_kwh" type="number" step="0.5" value="0" min="0">
-        </div>
-
+        <!-- Battery advanced -->
+        <h4>Battery Advanced</h4>
         <div class="row">
           <label>Initial SoC (0-1)</label>
           <input id="soc_init" type="number" step="0.05" value="0.5" min="0" max="1">
@@ -458,31 +457,16 @@
     </details>
 
 
-    <div class="row">
-      <label>Day</label>
-      <input id="day" type="date">
-    </div>
-
-    <div class="row">
-      <label>24h resolution</label>
-      <select id="freq">
-        <option value="1h">Hourly</option>
-        <option value="15min">15 min</option>
-        <option value="5min">5 min</option>
-      </select>
-    </div>
-
     <button id="btnSummary">Refresh summary</button>
     <button id="btnMonthly">Monthly overview (2025)</button>
 
     <div class="hr"></div>
-
+    <h1>Outputs</h1>
     <div class="small"><b>Status:</b> <span id="status">Click map to set location. Use Refresh summary / Show plots afterwards.</span></div>
     <div class="small"><b>Selected:</b> <span id="coord">—</span></div>
 
     <div id="summary">No summary yet.</div>
     <div class="hr"></div>
-    <div id="simulation">No simulation yet.</div>
     <div id="simulationYear">No yearly simulation yet.</div>
 
 
@@ -505,13 +489,10 @@
   const prEl = document.getElementById("pr");
   const tiltEl = document.getElementById("tilt");
   const azEl = document.getElementById("az");
-  const dayEl = document.getElementById("day");
-  const freqEl = document.getElementById("freq");
   const annualKwhEl = document.getElementById("annual_kwh");
 
     //Simulering Solpanel
   const simBox = document.getElementById("simBox");
-  const simEl = document.getElementById("simulation");
   const simYearEl = document.getElementById("simulationYear");
 
     //Simulering med Batteri
@@ -619,84 +600,6 @@
     });
   }
 
-
-  function renderSimulation(data) {
-    const s = data.summary;
-
-    function fmt(x, digits = 2) {
-      if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
-      return Number(x).toFixed(digits);
-    }
-
-    function pct(x) {
-      if (x === null || x === undefined) return "—";
-      return (Number(x) * 100).toFixed(1) + " %";
-    }
-
-    const html = `
-      <details class="section">
-        <summary>
-          Simulation (Chosen day)
-          <span class="badge">${fmt(s.savings_dkk)} DKK</span>
-        </summary>
-
-        <div class="body">
-
-          <details class="section" open>
-            <summary>Costs</summary>
-            <div class="body">
-              <div class="row2">
-                <div class="k">Baseline cost</div>
-                <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
-
-                <div class="k">Cost with PV</div>
-                <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
-
-                <div class="k">Savings</div>
-                <div class="v"><b>${fmt(s.savings_dkk)} DKK</b></div>
-              </div>
-            </div>
-          </details>
-
-          <details class="section" open>
-            <summary>Energy flows</summary>
-            <div class="body">
-              <div class="row2">
-                <div class="k">Load</div>
-                <div class="v">${fmt(s.load_kwh)} kWh</div>
-
-                <div class="k">PV production</div>
-                <div class="v">${fmt(s.pv_kwh)} kWh</div>
-
-                <div class="k">Grid import</div>
-                <div class="v">${fmt(s.import_kwh)} kWh</div>
-
-                <div class="k">Grid export</div>
-                <div class="v">${fmt(s.export_kwh)} kWh</div>
-              </div>
-            </div>
-          </details>
-
-          <details class="section" open>
-            <summary>Key ratios</summary>
-            <div class="body">
-              <div class="row2">
-                <div class="k">Self-consumption</div>
-                <div class="v">${pct(s.self_consumption_ratio)}</div>
-
-                <div class="k">Self-sufficiency</div>
-                <div class="v">${pct(s.self_sufficiency)}</div>
-              </div>
-            </div>
-          </details>
-
-        </div>
-      </details>
-    `;
-
-    simEl.innerHTML = html;
-  }
-
   function renderSimulationYear(data) {
     const s = data.summary;
     const year = data.inputs.year;
@@ -779,8 +682,6 @@
 
     const peakPoa = Math.round(data.peak_poa_wm2);
     const peakPower = Math.round(data.peak_power_w);
-
-    const dayKwh = data.energy_day_kwh_clear_sky.toFixed(2);
     const yearKwh = Math.round(data.energy_year_kwh_tmy);
 
     const html = `
@@ -793,17 +694,11 @@
         <div class="body">
 
           <details class="section" open>
-            <summary>Overview</summary>
+            <summary>Energy results</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Location ${tip("Latitude/longitude of the clicked point on the map.")}</div>
-                <div class="v">${escapeHtml(locationStr)}</div>
-
-                <div class="k">Settings ${tip("kWp is the PV system rated power at STC. PR is a loss factor (1.00 = no losses). Tilt/azimuth define panel orientation.")}</div>
-                <div class="v">${escapeHtml(settingsStr)}</div>
-
-                <div class="k">Selected day</div>
-                <div class="v">${escapeHtml(s.day)} (step=${escapeHtml(s.freq)})</div>
+                <div class="k">Year total (TMY/PVGIS)</div>
+                <div class="v">${yearKwh} kWh (year ${escapeHtml(String(s.year))})</div>
               </div>
             </div>
           </details>
@@ -825,9 +720,6 @@
             <summary>Energy results</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Clear-sky day</div>
-                <div class="v">${dayKwh} kWh</div>
-
                 <div class="k">Year total (TMY/PVGIS)</div>
                 <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
               </div>
@@ -1078,12 +970,6 @@
   }
 
   async function init() {
-    // Default date = today
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    dayEl.value = "2025-06-15";
     const extraOverlays = {}; // name -> Leaflet layer
     const center = await getJSON("/api/center");
 
@@ -1210,15 +1096,12 @@
         pr: prEl.value,
         tilt: tiltEl.value,
         az: azEl.value,
-        day: dayEl.value,
-        freq: freqEl.value,
         annual_kwh: annualKwhEl.value,
       });
 
       addBatteryParams(params);
 
       // show some progress in the UI (optional but nice)
-      if (typeof simEl !== "undefined" && simEl) simEl.innerHTML = "<div class='small'>Running daily simulation…</div>";
       if (typeof simYearEl !== "undefined" && simYearEl) simYearEl.innerHTML = "<div class='small'>Running yearly simulation…</div>";
 
       try {
@@ -1227,12 +1110,10 @@
         lastSummary = summary;
         renderSummary(summary);
 
-        // 2) Day simulation
-        const daySim = await getJSON(`/api/simulate_day?${params.toString()}`);
-        renderSimulation(daySim);
+        // 2) Day simulation (removed function)
 
         // 3) Year simulation
-        const year = String(dayEl.value).slice(0, 4);
+        const year = "2025";
         const yearParams = new URLSearchParams({
           lat: selected.lat,
           lon: selected.lon,

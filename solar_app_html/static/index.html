@@ -351,6 +351,39 @@
       margin: 0;
     }
 
+    /* ===== Azimuth measurement tool ===== */
+
+    .az-arrow-head {
+      font-size: 18px;
+      line-height: 18px;
+      color: #111;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+      transform-origin: 50% 60%;
+    }
+
+    .az-tip div {
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .az-btn {
+      padding: 8px 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .az-btn.active {
+      background: #111;
+      color: #fff;
+    }
+
+
     @media (max-width: 900px) {
       .modalGrid { grid-template-columns: 1fr; }
     }
@@ -528,7 +561,7 @@
     if (!r.ok) throw new Error(await r.text());
     return await r.json();
   }
-
+  
   function addBatteryParams(params) {
     params.set("battery_kwh", battKwhEl.value);
     params.set("soc_init", socInitEl.value);
@@ -1015,7 +1048,6 @@
       <details class="planItem">
         <summary>
           ${escapeHtml(std.title)}
-          <span class="pill">${escapeHtml(std.subtitle)}</span>
         </summary>
         <div class="planBody">
           <div class="small" style="margin-bottom: 10px;">
@@ -1052,7 +1084,6 @@
   function buildStandardPlan() {
     return {
       title: "Standard vejledning",
-      subtitle: "Når ingen lokalplan er fundet",
       intro:
         "Her er nyttige steder at starte – også selvom der er fundet en lokalplan. Brug dem til at forstå rammer, regler og bevaringsforhold.",
       links: [
@@ -1116,12 +1147,211 @@
     return escapeHtml(s);
   }
 
+  /* ===========================
+    Azimuth measurement helpers
+    =========================== */
+
+  function normalizeDeg(deg) {
+    let d = deg % 360;
+    if (d < 0) d += 360;
+    return d;
+  }
+
+  // Bearing from point A to B (0° = North, clockwise)
+  function bearingDeg(a, b) {
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const dLon = (b.lng - a.lng) * Math.PI / 180;
+
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) -
+              Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+    const brng = Math.atan2(y, x) * 180 / Math.PI;
+    return normalizeDeg(brng);
+  }
+
+  function makeAzimuthTool(map, azInputEl, statusEl, onStateChange) {
+    let enabled = false;
+    let dragging = false;
+    let startLatLng = null;
+
+    let arrowLine = null;
+    let arrowHead = null;
+    let tip = null;
+    let perpTick = null;
+
+
+    function clearGraphics() {
+      if (arrowLine) { map.removeLayer(arrowLine); arrowLine = null; }
+      if (arrowHead) { map.removeLayer(arrowHead); arrowHead = null; }
+      if (tip) { map.removeLayer(tip); tip = null; }
+      if (perpTick) { map.removeLayer(perpTick); perpTick = null; }
+    }
+
+    function setEnabled(on) {
+      enabled = on;
+      clearGraphics();
+      dragging = false;
+      startLatLng = null;
+
+      if (enabled) {
+        map.dragging.disable();
+        map.doubleClickZoom.disable();
+        statusEl.textContent = "Azimuth-værktøj: klik og træk for at måle retning.";
+        map.getContainer().style.cursor = "crosshair";
+      } else {
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
+        statusEl.textContent = "Azimuth-værktøj slået fra.";
+        map.getContainer().style.cursor = "";
+      }
+
+      if (typeof onStateChange === "function") onStateChange(enabled);
+    }
+
+    function updateArrow(endLatLng) {
+      const az = bearingDeg(startLatLng, endLatLng);
+      azInputEl.value = String(Math.round(az));
+      // --- Perpendicular tick at start point (screen-space so length is constant) ---
+      const a = map.latLngToLayerPoint(startLatLng);
+      const b = map.latLngToLayerPoint(endLatLng);
+
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const vlen = Math.hypot(vx, vy);
+
+      // Only draw if user has moved enough pixels (avoid NaNs when start=end)
+      if (vlen > 2) {
+        // Unit perpendicular vector
+        const px = -vy / vlen;
+        const py =  vx / vlen;
+
+        const tickLenPx = 24; // adjust to taste
+        const half = tickLenPx / 2;
+
+        const p1 = L.point(a.x + px * half, a.y + py * half);
+        const p2 = L.point(a.x - px * half, a.y - py * half);
+
+        const ll1 = map.layerPointToLatLng(p1);
+        const ll2 = map.layerPointToLatLng(p2);
+
+        if (!perpTick) {
+          perpTick = L.polyline([ll1, ll2], { weight: 3, opacity: 0.9 }).addTo(map);
+        } else {
+          perpTick.setLatLngs([ll1, ll2]);
+        }
+      }
+
+
+      const lineLatLngs = [startLatLng, endLatLng];
+      if (!arrowLine) {
+        arrowLine = L.polyline(lineLatLngs, { weight: 3 }).addTo(map);
+      } else {
+        arrowLine.setLatLngs(lineLatLngs);
+      }
+
+      const html = `<div class="az-arrow-head" style="transform: rotate(${az}deg);">▲</div>`;
+      const icon = L.divIcon({ className: "", html, iconSize: [20,20], iconAnchor: [10,10] });
+
+      if (!arrowHead) {
+        arrowHead = L.marker(endLatLng, { icon, interactive:false }).addTo(map);
+      } else {
+        arrowHead.setLatLng(endLatLng);
+        arrowHead.setIcon(icon);
+      }
+
+      const label = `Azimuth: ${Math.round(az)}°`;
+
+      if (!tip) {
+        tip = L.marker(endLatLng, {
+          icon: L.divIcon({
+            className: "az-tip",
+            html: `<div>${label}</div>`,
+            iconSize: [120,24],
+            iconAnchor: [10,30]
+          }),
+          interactive:false
+        }).addTo(map);
+      } else {
+        tip.setLatLng(endLatLng);
+        tip.setIcon(L.divIcon({
+          className: "az-tip",
+          html: `<div>${label}</div>`,
+          iconSize: [120,24],
+          iconAnchor: [10,30]
+        }));
+      }
+    }
+
+    function onMouseDown(e) {
+      if (!enabled) return;
+      dragging = true;
+      startLatLng = e.latlng;
+      clearGraphics();
+      updateArrow(e.latlng);
+    }
+
+    function onMouseMove(e) {
+      if (!enabled || !dragging) return;
+      updateArrow(e.latlng);
+    }
+
+    function onMouseUp(e) {
+      if (!enabled || !dragging) return;
+      dragging = false;
+      const az = bearingDeg(startLatLng, e.latlng);
+      azInputEl.value = String(Math.round(az));
+      setEnabled(false); // auto turn off after use
+    }
+
+    map.on("mousedown", onMouseDown);
+    map.on("mousemove", onMouseMove);
+    map.on("mouseup", onMouseUp);
+
+    return {
+      toggle: () => setEnabled(!enabled),
+      isEnabled: () => enabled
+    };
+  }
+
+
   async function init() {
     const extraOverlays = {}; // name -> Leaflet layer
     const center = await getJSON("/api/center");
     plansEl.innerHTML = "<div class='small'>Tryk “Refresh summary” for at se planer og vejledning.</div>";
     // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
+
+    // ===== Azimuth tool =====
+    let azBtn = null;
+
+    const azTool = makeAzimuthTool(map, azEl, statusEl, (enabled) => {
+      if (!azBtn) return;
+      azBtn.textContent = enabled ? "Stop azimuth" : "Mål azimuth";
+      azBtn.classList.toggle("active", enabled);
+    });
+
+    const AzControl = L.Control.extend({
+      onAdd: function() {
+        const btn = L.DomUtil.create("button");
+        btn.type = "button";
+        btn.textContent = "Mål azimuth";
+        btn.className = "az-btn";
+        azBtn = btn;
+
+        L.DomEvent.disableClickPropagation(btn);
+        L.DomEvent.on(btn, "click", (e) => {
+          L.DomEvent.stop(e);
+          azTool.toggle(); // callback updates text + class
+        });
+
+        return btn;
+      }
+    });
+
+    map.addControl(new AzControl({ position: "bottomleft" }));
+
 
     // ----- Base layers -----
 

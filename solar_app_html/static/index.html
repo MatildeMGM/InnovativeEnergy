@@ -480,7 +480,7 @@
     <div class="hr"></div>
     <h4 style="margin: 8px 0;">Plans</h4>
     <div id="bevaringskodeBox">Bevaringskategori:</div>
-    <div id="plans">No plans yet.</div>
+    <div id="plans"></div>
   </div>
 
   <div id="map"></div>
@@ -896,86 +896,6 @@
     return html || "<div class='small'>No relevant fields found in details.</div>";
   }
 
-  function renderStandardLokalPlanCard(hasPlans) {
-    const title = hasPlans
-      ? "Next steps (even when a plan is found)"
-      : "What to do if no lokalplan is found";
-
-    const subtitle = hasPlans
-      ? "Use this to verify rules, find the PDF, and check additional constraints."
-      : "Use these sources to find relevant rules and documents for the location.";
-
-    const tips = hasPlans
-      ? `
-        <ul style="margin:8px 0 0 16px; padding:0;">
-          <li>Open the plan document (doklink) and search for: height limits, setbacks, roof rules, and technical installations.</li>
-          <li>Check if there are general restrictions that apply even with a plan (protected lines, nature areas, heritage, etc.).</li>
-          <li>If multiple plans overlap, the newest/specific plan usually matters most — confirm in the PDF.</li>
-        </ul>
-      `
-      : `
-        <ul style="margin:8px 0 0 16px; padding:0;">
-          <li>Zoom in and click again (plans can be thin/fragmented polygons).</li>
-          <li>Try a nearby point within the same parcel/area.</li>
-          <li>Use the municipality plan portal to locate plans by address/cadastral.</li>
-        </ul>
-      `;
-
-    return `
-      <details class="planItem" open>
-        <summary>
-          ${escapeHtml(title)}
-          <span class="pill">${hasPlans ? "Plan loaded" : "No plan found"}</span>
-        </summary>
-        <div class="planBody">
-          <div class="small" style="margin-bottom:8px;">
-            ${escapeHtml(subtitle)}
-          </div>
-
-          <div class="detailSection">
-            <div class="detailTitle">Where to look</div>
-            <div class="detailBody">
-              <div class="detailRow">
-                <div class="detailLabel">Plan document (PDF)</div>
-                <div class="detailValue">
-                  If available in the plan data (doklink/url), open it and look for binding rules and maps.
-                </div>
-              </div>
-              <div class="detailRow">
-                <div class="detailLabel">Municipality plan portal</div>
-                <div class="detailValue">
-                  Search by address/area to confirm applicable lokalplan/kommuneplan and any updates.
-                </div>
-              </div>
-              <div class="detailRow">
-                <div class="detailLabel">Protected areas</div>
-                <div class="detailValue">
-                  Check nature protection, coastline protection, Natura 2000, and other restrictions that may override/limit projects.
-                </div>
-              </div>
-              <div class="detailRow">
-                <div class="detailLabel">Cultural heritage</div>
-                <div class="detailValue">
-                  Listed buildings / protected environments / archaeology constraints may apply even with a plan.
-                </div>
-              </div>
-              <div class="detailRow">
-                <div class="detailLabel">Technical constraints</div>
-                <div class="detailValue">
-                  Grid connection, easements, road setbacks, and utility corridors can affect PV/battery placement.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="small">
-            ${tips}
-          </div>
-        </div>
-      </details>
-    `;
-  }
-
   function renderBevaringskode(data) {
     const code = data?.bevaringskode ?? null;
 
@@ -996,27 +916,45 @@
   function renderPlans(plans) {
     if (!plansEl) return;
 
-    const hasPlans = Array.isArray(plans) && plans.length > 0;
+    const standardPlan = buildStandardPlan();
+
+    // Always render ONE combined "Plans" section containing:
+    // 1) Standard info (always shown)
+    // 2) Lokalplan hits (if any)
     const parts = [];
 
-    // Always show the guidance card (changes text depending on hasPlans)
-    parts.push(renderStandardLokalPlanCard(hasPlans));
+    parts.push(`
+      <details class="section" open>
+        <summary>
+          Planer og vejledning
+          <span class="badge">${Array.isArray(plans) ? plans.length : 0}</span>
+        </summary>
+        <div class="body">
+          ${renderStandardPlanItem(standardPlan)}
+          ${renderFoundPlans(plans)}
+        </div>
+      </details>
+    `);
 
-    if (!hasPlans) {
-      parts.push("<div class='small' style='margin-top:8px;'>No plans found at clicked location.</div>");
-      plansEl.innerHTML = parts.join("");
-      return;
+    plansEl.innerHTML = parts.join("");
+  }
+
+  function renderFoundPlans(plans) {
+    if (!plans || !Array.isArray(plans) || plans.length === 0) {
+      return `<div class="small">Ingen lokalplaner fundet for det valgte punkt. Se “Standard vejledning” ovenfor.</div>`;
     }
 
-    parts.push(`<div class="small" style="margin-top:8px;"><b>Found:</b> ${plans.length}</div>`);
+    // Show a small count line (optional)
+    const parts = [];
+    parts.push(`<div class="small"><b>Fundet:</b> ${plans.length} plan(er)</div>`);
 
     plans.forEach((p, idx) => {
       const name = p.plannavn || p.plan_navn || p.navn || `Plan ${idx + 1}`;
       const id = p.planid ? String(p.planid) : "";
       const det = p.details?.[0] || {};
 
-      function warn(flag, label){
-        return flag ? `<span class="warnPill">⚠ ${label}</span>` : "";
+      function warn(flag, label) {
+        return flag ? `<span class="warnPill">${escapeHtml(label)}</span>` : "";
       }
 
       const warnings = [
@@ -1038,21 +976,29 @@
             <div class="kv">
               ${Object.entries(p).map(([k, v]) => {
                 if (v === null || v === undefined || v === "") return "";
-                const keyLabel = niceLabel(k);
 
+                // Keep your special rendering for details
                 if (k === "details") {
                   return `<div style="grid-column: 1 / -1;">${renderDetails(v)}</div>`;
                 }
 
+                const keyLabel = niceLabel(k);
                 const valStr = String(v);
 
+                // Links become "Open document"
                 if (isUrl(valStr)) {
-                  return `<div class="k">${escapeHtml(keyLabel)}</div>
-                          <div class="v"><a href="${escapeAttr(valStr)}" target="_blank" rel="noopener noreferrer">Open document</a></div>`;
+                  return `
+                    <div class="k">${escapeHtml(keyLabel)}</div>
+                    <div class="v">
+                      <a href="${escapeAttr(valStr)}" target="_blank" rel="noopener noreferrer">Åbn dokument</a>
+                    </div>
+                  `;
                 }
 
-                return `<div class="k">${escapeHtml(keyLabel)}</div>
-                        <div class="v">${escapeHtml(valStr)}</div>`;
+                return `
+                  <div class="k">${escapeHtml(keyLabel)}</div>
+                  <div class="v">${escapeHtml(valStr)}</div>
+                `;
               }).join("")}
             </div>
           </div>
@@ -1060,7 +1006,100 @@
       `);
     });
 
-    plansEl.innerHTML = parts.join("");
+    return parts.join("");
+  }
+
+  function renderStandardPlanItem(std) {
+    // One collapsible planItem, same styling as the others
+    return `
+      <details class="planItem">
+        <summary>
+          ${escapeHtml(std.title)}
+          <span class="pill">${escapeHtml(std.subtitle)}</span>
+        </summary>
+        <div class="planBody">
+          <div class="small" style="margin-bottom: 10px;">
+            ${escapeHtml(std.intro)}
+          </div>
+
+          <div class="kv">
+            ${std.links.map(link => {
+              return `
+                <div class="k">${escapeHtml(link.label)}</div>
+                <div class="v">
+                  <a href="${escapeAttr(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.linkText)}</a>
+                  ${link.desc ? `<div class="small" style="margin-top:4px;">${escapeHtml(link.desc)}</div>` : ""}
+                </div>
+              `;
+            }).join("")}
+          </div>
+
+          ${std.hints && std.hints.length
+            ? `
+              <div class="hr"></div>
+              <div class="small"><b>Hvis der ikke findes en lokalplan ved punktet:</b></div>
+              <ul class="small" style="margin: 8px 0 0 18px; padding: 0;">
+                ${std.hints.map(h => `<li>${escapeHtml(h)}</li>`).join("")}
+              </ul>
+            `
+            : ""
+          }
+        </div>
+      </details>
+    `;
+  }
+
+  function buildStandardPlan() {
+    return {
+      title: "Standard vejledning",
+      subtitle: "Når ingen lokalplan er fundet",
+      intro:
+        "Her er nyttige steder at starte – også selvom der er fundet en lokalplan. Brug dem til at forstå rammer, regler og bevaringsforhold.",
+      links: [
+        {
+          label: "Rammer for lokalplanlægning",
+          linkText: "Åbn rammer i DKPlan",
+          url: "https://bornholm.viewer.dkplan.niras.dk/plan/24#/4487",
+          desc: "Overblik over kommuneplanrammer og planlægning.",
+        },
+        {
+          label: "Solceller, husstandsvind og jordvarme",
+          linkText: "Åbn Bornholm.dk vejledning",
+          url: "https://bornholm.dk/service-og-selvbetjening/by-og-bolig/byggeri-og-nedrivning/solcelleanlaeg-hustandsvindmoeller-jordvarme",
+          desc: "Praktisk info om opførelse/ansøgning og typiske krav.",
+        },
+        {
+          label: "Kort: fredning og bevaringsværdi",
+          linkText: "Åbn kort",
+          url: "https://drift.kortinfo.net/Map.aspx?page=ArealInformation&Site=Bornholm",
+          desc: "Se fredede områder og fredede/bevaringsværdige bygninger.",
+        },
+        {
+          label: "Aktuelle lokalplaner (index)",
+          linkText: "Åbn lokalplan-index",
+          url: "https://bornholm.viewer.dkplan.niras.dk/plan/23",
+          desc: "Find og læs aktuelle lokalplaner på Bornholm.",
+        },
+        {
+          label: "Retsinformation",
+          linkText: "Åbn retsinformation.dk",
+          url: "https://www.retsinformation.dk/",
+          desc: "Søg i gældende love og bekendtgørelser (fx planloven og bygningsreglementet).",
+        },
+        {
+          label: "Energiforbedring (SLKS PDF)",
+          linkText: "Åbn vejledning (PDF)",
+          url: "https://slks.dk/fileadmin/user_upload/SLKS/Omraader/Kulturarv/Bygningsfredning/Gode_raad_om_vedligeholdelse/13.1_Energiforbedring_af_fredede_og_bevaringsvaerdige_by.pdf",
+          desc: "Gode råd til energiforbedringer af fredede og bevaringsværdige bygninger.",
+        },
+      ],
+      hints: [
+        "Tjek kortet for fredning/bevaringsværdi og se evt. Bevaringskode.",
+        "Find relevante kommuneplanrammer (DKPlan) og lokale restriktioner.",
+        "Slå de relevante regler op i Retsinformation (planlov, BR18 m.fl.).",
+        "Hvis du er i tvivl: kontakt Bornholms Regionskommune med adresse/matrikel.",
+      ],
+    };
   }
 
   // Basic escaping to avoid breaking HTML if plan fields contain odd characters
@@ -1080,7 +1119,7 @@
   async function init() {
     const extraOverlays = {}; // name -> Leaflet layer
     const center = await getJSON("/api/center");
-    plansEl.innerHTML = renderStandardLokalPlanCard(false);
+    plansEl.innerHTML = "<div class='small'>Tryk “Refresh summary” for at se planer og vejledning.</div>";
     // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
 

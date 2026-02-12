@@ -18,6 +18,14 @@
     #wrap { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
     #side { padding: 12px; border-right: 1px solid #ddd; overflow: auto; }
     #map { height: 100vh; cursor: crosshair; }
+    #bevaringskodeBox {
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      margin: 8px 0;
+    }
 
     .row { margin-bottom: 10px; }
     label { display: block; font-size: 12px; color: #444; margin-bottom: 4px; }
@@ -469,10 +477,9 @@
     <div class="hr"></div>
     <div id="simulationYear">No yearly simulation yet.</div>
 
-
-
     <div class="hr"></div>
     <h4 style="margin: 8px 0;">Plans</h4>
+    <div id="bevaringskodeBox">Bevaringskategori:</div>
     <div id="plans">No plans yet.</div>
   </div>
 
@@ -490,6 +497,8 @@
   const tiltEl = document.getElementById("tilt");
   const azEl = document.getElementById("az");
   const annualKwhEl = document.getElementById("annual_kwh");
+
+  const bevaringskodeEl = document.getElementById("bevaringskodeBox");
 
     //Simulering Solpanel
   const simBox = document.getElementById("simBox");
@@ -887,22 +896,123 @@
     return html || "<div class='small'>No relevant fields found in details.</div>";
   }
 
+  function renderStandardLokalPlanCard(hasPlans) {
+    const title = hasPlans
+      ? "Next steps (even when a plan is found)"
+      : "What to do if no lokalplan is found";
+
+    const subtitle = hasPlans
+      ? "Use this to verify rules, find the PDF, and check additional constraints."
+      : "Use these sources to find relevant rules and documents for the location.";
+
+    const tips = hasPlans
+      ? `
+        <ul style="margin:8px 0 0 16px; padding:0;">
+          <li>Open the plan document (doklink) and search for: height limits, setbacks, roof rules, and technical installations.</li>
+          <li>Check if there are general restrictions that apply even with a plan (protected lines, nature areas, heritage, etc.).</li>
+          <li>If multiple plans overlap, the newest/specific plan usually matters most — confirm in the PDF.</li>
+        </ul>
+      `
+      : `
+        <ul style="margin:8px 0 0 16px; padding:0;">
+          <li>Zoom in and click again (plans can be thin/fragmented polygons).</li>
+          <li>Try a nearby point within the same parcel/area.</li>
+          <li>Use the municipality plan portal to locate plans by address/cadastral.</li>
+        </ul>
+      `;
+
+    return `
+      <details class="planItem" open>
+        <summary>
+          ${escapeHtml(title)}
+          <span class="pill">${hasPlans ? "Plan loaded" : "No plan found"}</span>
+        </summary>
+        <div class="planBody">
+          <div class="small" style="margin-bottom:8px;">
+            ${escapeHtml(subtitle)}
+          </div>
+
+          <div class="detailSection">
+            <div class="detailTitle">Where to look</div>
+            <div class="detailBody">
+              <div class="detailRow">
+                <div class="detailLabel">Plan document (PDF)</div>
+                <div class="detailValue">
+                  If available in the plan data (doklink/url), open it and look for binding rules and maps.
+                </div>
+              </div>
+              <div class="detailRow">
+                <div class="detailLabel">Municipality plan portal</div>
+                <div class="detailValue">
+                  Search by address/area to confirm applicable lokalplan/kommuneplan and any updates.
+                </div>
+              </div>
+              <div class="detailRow">
+                <div class="detailLabel">Protected areas</div>
+                <div class="detailValue">
+                  Check nature protection, coastline protection, Natura 2000, and other restrictions that may override/limit projects.
+                </div>
+              </div>
+              <div class="detailRow">
+                <div class="detailLabel">Cultural heritage</div>
+                <div class="detailValue">
+                  Listed buildings / protected environments / archaeology constraints may apply even with a plan.
+                </div>
+              </div>
+              <div class="detailRow">
+                <div class="detailLabel">Technical constraints</div>
+                <div class="detailValue">
+                  Grid connection, easements, road setbacks, and utility corridors can affect PV/battery placement.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="small">
+            ${tips}
+          </div>
+        </div>
+      </details>
+    `;
+  }
+
+  function renderBevaringskode(data) {
+    const code = data?.bevaringskode ?? null;
+
+    if (code === null || code === undefined || String(code).trim() === "") {
+      bevaringskodeEl.innerHTML = `
+        <div><b>Bevaringskategori:</b> —</div>
+        <div class="small">Ingen Bevaringskategori for pågældende lokation (kontroller om markør står hvor husnummeret er vist).</div>
+      `;
+      return;
+    }
+
+    bevaringskodeEl.innerHTML = `
+      <div><b>Bevaringskategori:</b> <span class="pill">${escapeHtml(String(code))}</span></div>
+      <div class="small">Indikerer at bygningen har en gældende Bevaringskategori, kontroller gældende lovgivning for kategori.</div>
+    `;
+  }
 
   function renderPlans(plans) {
     if (!plansEl) return;
 
-    if (!plans || plans.length === 0) {
-      plansEl.innerHTML = "<div class='small'>No plans found at clicked location.</div>";
+    const hasPlans = Array.isArray(plans) && plans.length > 0;
+    const parts = [];
+
+    // Always show the guidance card (changes text depending on hasPlans)
+    parts.push(renderStandardLokalPlanCard(hasPlans));
+
+    if (!hasPlans) {
+      parts.push("<div class='small' style='margin-top:8px;'>No plans found at clicked location.</div>");
+      plansEl.innerHTML = parts.join("");
       return;
     }
 
-    const parts = [];
-    parts.push(`<div class="small"><b>Found:</b> ${plans.length}</div>`);
+    parts.push(`<div class="small" style="margin-top:8px;"><b>Found:</b> ${plans.length}</div>`);
 
     plans.forEach((p, idx) => {
       const name = p.plannavn || p.plan_navn || p.navn || `Plan ${idx + 1}`;
       const id = p.planid ? String(p.planid) : "";
-      const status = p.status ? String(p.status) : "";
       const det = p.details?.[0] || {};
 
       function warn(flag, label){
@@ -917,7 +1027,6 @@
         warn(det.andet_relevant_regulering, "Andet"),
       ].join("");
 
-      // Her kan der udføres visuelle ændringer for plan-interface på HTML
       parts.push(`
         <details class="planItem">
           <summary>
@@ -931,7 +1040,6 @@
                 if (v === null || v === undefined || v === "") return "";
                 const keyLabel = niceLabel(k);
 
-                // ✅ Special rendering for details (array of objects)
                 if (k === "details") {
                   return `<div style="grid-column: 1 / -1;">${renderDetails(v)}</div>`;
                 }
@@ -972,7 +1080,7 @@
   async function init() {
     const extraOverlays = {}; // name -> Leaflet layer
     const center = await getJSON("/api/center");
-
+    plansEl.innerHTML = renderStandardLokalPlanCard(false);
     // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
 
@@ -1012,7 +1120,7 @@
 
     const layersResp = await getJSON("/api/layers");
     const layerMeta = layersResp.layers || [];
-
+    
     let boundsLayer = null;
 
     for (const info of layerMeta) {
@@ -1098,6 +1206,14 @@
         az: azEl.value,
         annual_kwh: annualKwhEl.value,
       });
+
+      try {
+        bevaringskodeEl.innerHTML = "<div class='small'>Looking up Bevaringskode…</div>";
+        const bk = await getJSON(`/api/bevaringskode?lat=${selected.lat}&lon=${selected.lon}`);
+        renderBevaringskode(bk);
+      } catch (e) {
+        bevaringskodeEl.innerHTML = "<div class='small'>Bevaringskode lookup failed.</div>";
+      }
 
       addBatteryParams(params);
 

@@ -18,6 +18,9 @@ import numpy as np
 import math
 from pathlib import Path
 import simulation
+import bevaringskode
+
+
 
 # ----------------------------
 # Base settings (same as original)
@@ -395,6 +398,24 @@ def _json_safe(x):
     # fallback to string (safe for weird objects)
     return str(x)
 
+@lru_cache(maxsize=2048)
+def _cached_bevaringskode(lon_r: float, lat_r: float) -> str | None:
+    # service wants (lon, lat), we cache rounded coords to reduce repeated calls
+    return bevaringskode.get_bevaringskode_unique(lon=lon_r, lat=lat_r, d=0.0001)
+
+@app.get("/api/bevaringskode")
+def api_bevaringskode(lat: float, lon: float):
+    try:
+        lon_r = round(float(lon), 5)
+        lat_r = round(float(lat), 5)
+        code = _cached_bevaringskode(lon_r, lat_r)
+        return {
+            "location": {"lat": float(lat), "lon": float(lon)},
+            "bevaringskode": code,  # string or None
+        }
+    except Exception as e:
+        # Don't crash UI if external service fails
+        return JSONResponse({"error": str(e), "bevaringskode": None}, status_code=200)
 
 # ----------------------------
 # Routes

@@ -45,9 +45,9 @@ LAYERS_CONFIG_PATH = LAYERS_DIR / "layers_config.json"
 
 BUILTIN_LAYER_IDS = {"bornholm", "planer"}  # served from memory, not from file
 
-DATA_DIR = Path(__file__).resolve().parent / "calculations/Dataset/2024"
-CONSUMPTION_PATH = DATA_DIR / "consumption_private_scaled_hourly.csv"
-PRICES_PATH = DATA_DIR / "elspot_DK1_with_total_prices.csv"
+DATA_DIR = Path(__file__).resolve().parent / "calculations/Dataset/BEOF_data"
+CONSUMPTION_PATH = DATA_DIR / "consumption_private_scaled_hourly_2025.csv"
+PRICES_PATH = DATA_DIR / "DK1_2025_hourly_for_program.csv"
 
 
 # ----------------------------
@@ -725,7 +725,7 @@ def api_simulate_year(
     eta_charge: float = Query(0.95),
     eta_discharge: float = Query(0.95),
 ):
-    year = 2024  # fixed for now
+    year = 2025  # fixed for now
 
     # PV: hourly from PVGIS TMY
     tmy = _get_pvgis_tmy_irradiance_cached(round(lat, 4), round(lon, 4))
@@ -750,8 +750,8 @@ def api_simulate_year(
     load_df = scale_load_to_annual(load_df, annual_kwh)
     price_df = simulation.read_prices(str(PRICES_PATH))
 
-    start_utc = pd.Timestamp("2024-01-01 00:00", tz="UTC")
-    end_utc = pd.Timestamp("2025-01-01 00:00", tz="UTC")
+    start_utc = pd.Timestamp("2025-01-01 00:00").tz_localize(TZ).tz_convert("UTC")
+    end_utc   = pd.Timestamp("2026-01-01 00:00").tz_localize(TZ).tz_convert("UTC")
 
     load_year = load_df.loc[start_utc:end_utc].reindex(pv_df.index)
     price_year = price_df.loc[start_utc:end_utc].reindex(pv_df.index)

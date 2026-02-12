@@ -19,8 +19,8 @@ TARIFFS_URL = "https://beof.dk/wp-json/beof/v1/tariffs"
 EDS_BASE = "https://api.energidataservice.dk/dataset/Elspotprices"
 
 # Time interval: MUST be 'YYYY-MM-DDTHH:MM'
-START = "2023-12-31T23:00"
-END = "2024-12-31T22:00"
+START = "2025-01-01T01:00"
+END = "2025-12-31T23:00"
 
 OUT_CSV = "BEOF_prices_tariffs.csv"
 
@@ -169,3 +169,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# %%
+import requests
+import pandas as pd
+
+URL = "https://beof.dk/wp-json/beof/v1/tariffs?start_date=2025-01-01T00:00&end_date=2025-12-31T24:00"
+OUT_CSV = "beof_tariffs_2024_2025.csv"
+
+# Download JSON
+r = requests.get(URL, timeout=60)
+r.raise_for_status()
+data = r.json()
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Optional: make sure time is parsed nicely and sorted
+if "time" in df.columns:
+    df["time"] = pd.to_datetime(df["time"], errors="coerce")
+    df = df.sort_values("time")
+
+# Save to CSV
+df.to_csv(OUT_CSV, index=False)
+
+print(f"Saved {len(df)} rows to {OUT_CSV}")
+print("Columns:", list(df.columns))
+
+# %%

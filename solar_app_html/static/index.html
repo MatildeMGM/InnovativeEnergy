@@ -397,19 +397,19 @@
   <div id="monthlyModal" class="modal" style="display:none;">
     <div class="modalCard">
       <div class="modalHeader">
-        <div style="font-weight:700;">Monthly overview (2025)</div>
+        <div style="font-weight:700;">Månedlig oversigt (2025)</div>
         <button id="btnMonthlyClose" class="modalClose">Close</button>
       </div>
 
       <div class="modalBody">
         <div class="modalGrid">
           <div class="modalPanel">
-            <div class="small"><b>Energy balance (kWh)</b></div>
+            <div class="small"><b>Energi balance (kWh)</b></div>
             <canvas id="chartMonthlyEnergy"></canvas>
           </div>
 
           <div class="modalPanel">
-            <div class="small"><b>Costs and savings (DKK)</b></div>
+            <div class="small"><b>Omkostninger og besparelser (DKK)</b></div>
             <canvas id="chartMonthlyCost"></canvas>
           </div>
         </div>
@@ -420,77 +420,77 @@
     <h1>Inputs</h1>
 
     <div class="row">
-      <label>Yearly consumption (kWh/year)</label>
+      <label>Årlig forbrug (kWh/år)</label>
       <input id="annual_kwh" type="number" value="4200" step="100" min="0">
     </div>
 
     <div class="row">
-      <label>PV size (kWp)</label>
+      <label>Solpanel størrelse (kWp)</label>
       <input id="kwp" type="number" step="0.1" value="1.0" min="0">
     </div>
 
     <div class="row">
-      <label>Battery size (kWh) (0 = off)</label>
+      <label>Batteri kapacitet (kWh) (0 = intet batteri)</label>
       <input id="batt_kwh" type="number" step="0.5" value="0" min="0">
     </div>
 
     <details class="section">
-      <summary>Advanced settings</summary>
+      <summary>Avancerede indstillinger</summary>
       <div class="body">
 
         <!-- PV advanced -->
-        <h4>PV Advanced</h4>
+        <h4>Avancerede Solpanel indstillinger</h4>
         <div class="row">
-          <label>Performance ratio PR</label>
+          <label>Virkningsgrad (PR)</label>
           <input id="pr" type="number" step="0.01" value="0.75" min="0" max="1.2">
         </div>
 
         <div class="row">
-          <label>Tilt (°)</label>
+          <label>Hældning (°)</label>
           <input id="tilt" type="number" step="1" value="40">
         </div>
 
         <div class="row">
-          <label>Azimuth (°)</label>
+          <label>Retning (azimuth) (°)</label>
           <input id="az" type="number" step="1" value="180">
         </div>
 
         <div class="hr"></div>
 
         <!-- Battery advanced -->
-        <h4>Battery Advanced</h4>
+        <h4>Avancerede Batteri indstillinger</h4>
         <div class="row">
-          <label>Initial SoC (0-1)</label>
+          <label>Start SoC (0-1)</label>
           <input id="soc_init" type="number" step="0.05" value="0.5" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>SoC min (0-1)</label>
+          <label>Minimum SoC (0-1)</label>
           <input id="soc_min" type="number" step="0.05" value="0.1" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>SoC max (0-1)</label>
+          <label>Maksimal SoC (0-1)</label>
           <input id="soc_max" type="number" step="0.05" value="0.9" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>Max charge power (kW) (blank = unlimited)</label>
+          <label>Maksimal opladningseffekt (kW) (blank = uendelig)</label>
           <input id="p_charge_kw" type="number" step="0.5" value="" min="0">
         </div>
 
         <div class="row">
-          <label>Max discharge power (kW) (blank = unlimited)</label>
+          <label>Maksimal afladningseffekt (kW) (blank = uendelig)</label>
           <input id="p_discharge_kw" type="number" step="0.5" value="" min="0">
         </div>
 
         <div class="row">
-          <label>Charge efficiency (0-1)</label>
+          <label>Opladnings effektivitet (0-1)</label>
           <input id="eta_c" type="number" step="0.01" value="0.95" min="0" max="1">
         </div>
 
         <div class="row">
-          <label>Discharge efficiency (0-1)</label>
+          <label>Afladnings effektivitet (0-1)</label>
           <input id="eta_d" type="number" step="0.01" value="0.95" min="0" max="1">
         </div>
 
@@ -498,20 +498,20 @@
     </details>
 
 
-    <button id="btnSummary">Refresh summary</button>
-    <button id="btnMonthly">Monthly overview (2025)</button>
+    <button id="btnSummary">Opdater oversigt</button>
+    <button id="btnMonthly">Månedlig oversigt (2025)</button>
 
     <div class="hr"></div>
     <h1>Outputs</h1>
-    <div class="small"><b>Status:</b> <span id="status">Click map to set location. Use Refresh summary / Show plots afterwards.</span></div>
-    <div class="small"><b>Selected:</b> <span id="coord">—</span></div>
+    <div class="small"><b>Status:</b> <span id="status">Klik på kort for at vælge lokation. Tryk derefter på Opdater oversigt.</span></div>
+    <div class="small"><b>Valgt koordinat:</b> <span id="coord">—</span></div>
 
-    <div id="summary">No summary yet.</div>
+    <div id="summary">Ingen oversigt endnu.</div>
     <div class="hr"></div>
-    <div id="simulationYear">No yearly simulation yet.</div>
+    <div id="simulationYear">Ingen årlig simulation kørt.</div>
 
     <div class="hr"></div>
-    <h4 style="margin: 8px 0;">Plans</h4>
+    <h4 style="margin: 8px 0;">Lokalplaner</h4>
     <div id="bevaringskodeBox">Bevaringskategori:</div>
     <div id="plans"></div>
   </div>
@@ -585,14 +585,14 @@
 
   function renderMonthlyCharts(yearSim) {
     if (!yearSim || !yearSim.monthly) {
-      throw new Error("No yearly monthly data available. Click Refresh summary first.");
+      throw new Error("Ingen årlig og månedlig data tilgængelig. Tryk på Opdater oversigt først");
     }
 
     const m = yearSim.monthly;
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
     const labels = m.month.map(s => {
-      const mm = Number(String(s).split("-")[1]);  // "2024-03" -> 3
+      const mm = Number(String(s).split("-")[1]); 
       return monthNames[mm - 1];
     });
 
@@ -606,10 +606,10 @@
       data: {
         labels,
         datasets: [
-          { label: "Load (kWh)", data: m.load_kwh, stack: "kwh" },
-          { label: "PV (kWh)", data: m.pv_kwh, stack: "kwh" },
+          { label: "Forbrug (kWh)", data: m.load_kwh, stack: "kwh" },
+          { label: "Solpanel (kWh)", data: m.pv_kwh, stack: "kwh" },
           { label: "Import (kWh)", data: m.import_kwh, stack: "kwh2" },
-          { label: "Export (kWh)", data: m.export_kwh, stack: "kwh2" },
+          { label: "Eksport (kWh)", data: m.export_kwh, stack: "kwh2" },
         ]
       },
       options: {
@@ -627,9 +627,9 @@
       data: {
         labels,
         datasets: [
-          { label: "Baseline cost (DKK)", data: m.baseline_cost_dkk },
-          { label: "Cost with PV (DKK)", data: m.system_cost_dkk },
-          { label: "Savings (DKK)", data: m.savings_dkk }
+          { label: "Basisomkostninger (uden Solpanel) (DKK)", data: m.baseline_cost_dkk },
+          { label: "Omkostninger med Solpanel (DKK)", data: m.system_cost_dkk },
+          { label: "Besparelser (DKK)", data: m.savings_dkk }
         ]
       },
       options: {
@@ -666,32 +666,32 @@
             <summary>Totals</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Baseline cost</div>
+                <div class="k">Basisomkostninger (uden Solpanel)</div>
                 <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
 
-                <div class="k">Cost with PV</div>
+                <div class="k">Omkostninger med Solpanel</div>
                 <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
 
-                <div class="k">Savings</div>
+                <div class="k">Besparelser</div>
                 <div class="v"><b>${fmt(s.savings_dkk)} DKK</b></div>
 
-                <div class="k">Load</div>
+                <div class="k">Forbrug</div>
                 <div class="v">${fmt(s.load_kwh)} kWh</div>
 
-                <div class="k">PV production</div>
+                <div class="k">Solpanel produktion</div>
                 <div class="v">${fmt(s.pv_kwh)} kWh</div>
               </div>
             </div>
           </details>
 
           <details class="section" open>
-            <summary>Key ratios</summary>
+            <summary>Dækningsgrader</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Self-consumption</div>
+                <div class="k">Selvforbrug</div>
                 <div class="v">${pct(s.self_consumption_ratio)}</div>
 
-                <div class="k">Self-sufficiency</div>
+                <div class="k">Selvforsyningsgrad</div>
                 <div class="v">${pct(s.self_sufficiency)}</div>
               </div>
             </div>
@@ -705,7 +705,7 @@
   function setSelected(lat, lon) {
     selected = {lat, lon};
     coord.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-    statusEl.textContent = "Location set. Use Refresh summary / Show plots afterwards.";
+    statusEl.textContent = "Lokation valgt. Tryk på Opdater oversigt.";
 
     if (marker) {
       marker.setLatLng([lat, lon]);
@@ -729,40 +729,40 @@
     const html = `
       <details class="section">
         <summary>
-          PV results
-          <span class="badge">${yearKwh} kWh/yr</span>
+          Solpanel Resultater
+          <span class="badge">${yearKwh} kWh/år</span>
         </summary>
 
         <div class="body">
 
           <details class="section" open>
-            <summary>Energy results</summary>
+            <summary>Energi resultater</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Year total (TMY/PVGIS)</div>
-                <div class="v">${yearKwh} kWh (year ${escapeHtml(String(s.year))})</div>
+                <div class="k">Årlig total (TMY/PVGIS)</div>
+                <div class="v">${yearKwh} kWh (år ${escapeHtml(String(s.year))})</div>
               </div>
             </div>
           </details>
 
           <details class="section" open>
-            <summary>Peak values</summary>
+            <summary>Peak-værdier</summary>
             <div class="body">
               <div class="row2">
                 <div class="k">Peak POA</div>
                 <div class="v">${peakPoa} W/m²</div>
 
-                <div class="k">Peak PV power</div>
+                <div class="k">Peak Solpanel effekt</div>
                 <div class="v">${peakPower} W</div>
               </div>
             </div>
           </details>
 
           <details class="section" open>
-            <summary>Energy results</summary>
+            <summary>Energi (el) resultater</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Year total (TMY/PVGIS)</div>
+                <div class="k">Årlig total (TMY/PVGIS)</div>
                 <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
               </div>
             </div>
@@ -846,14 +846,14 @@
   function niceLabel(key) {
     // Optional: rename keys to nicer labels
     const map = {
-      plannavn: "Plan name",
+      plannavn: "Plan navn",
       planid: "Plan ID",
       plantype: "Plan type",
       status: "Status",
-      doklink: "Document",
+      doklink: "Dokument",
       link: "Link",
       url: "URL",
-      doklink: "Document"
+      doklink: "Dokument"
     };
     return map[key] || key;
   }
@@ -885,7 +885,7 @@
 
   function renderDetails(details) {
     if (!details || !Array.isArray(details) || details.length === 0) {
-      return "<div class='small'>No extra details.</div>";
+      return "<div class='small'>Ingen ekstra detaljer.</div>";
     }
 
     const d = details[0];
@@ -926,7 +926,7 @@
 
     const html = [sol, vind, batteri, tekniske, andet, kort].filter(Boolean).join("");
 
-    return html || "<div class='small'>No relevant fields found in details.</div>";
+    return html || "<div class='small'>Ingen relevante områder fundet i detaljer.</div>";
   }
 
   function renderBevaringskode(data) {
@@ -935,7 +935,7 @@
     if (code === null || code === undefined || String(code).trim() === "") {
       bevaringskodeEl.innerHTML = `
         <div><b>Bevaringskategori:</b> —</div>
-        <div class="small">Ingen Bevaringskategori for pågældende lokation (kontroller om markør står hvor husnummeret er vist).</div>
+        <div class="small">Ingen Bevaringskategori fundet for pågældende lokation (kontroller om markør står hvor husnummeret er vist).</div>
       `;
       return;
     }
@@ -1516,17 +1516,17 @@
         const yearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
         renderSimulationYear(yearSim);
 
-        statusEl.textContent = "All results updated.";
+        statusEl.textContent = "Alle resultater opdateret.";
       } catch (err) {
-        statusEl.textContent = "Error while computing results.";
+        statusEl.textContent = "Fejl under beregning af resultater.";
         console.error(err);
 
         // show errors in the boxes if present
         if (typeof simEl !== "undefined" && simEl) {
-          simEl.innerHTML = "<pre class='small'>Error:\n" + escapeHtml(String(err)) + "</pre>";
+          simEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
         }
         if (typeof simYearEl !== "undefined" && simYearEl) {
-          simYearEl.innerHTML = "<pre class='small'>Error:\n" + escapeHtml(String(err)) + "</pre>";
+          simYearEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
         }
       }
     };
@@ -1544,7 +1544,7 @@
       try {
         renderMonthlyCharts(lastYearSim);
         openMonthlyModal();
-        statusEl.textContent = "Monthly overview opened.";
+        statusEl.textContent = "Månedlig oversigt åbnet.";
       } catch (err) {
         statusEl.textContent = String(err);
         console.error(err);
@@ -1555,7 +1555,7 @@
 
   init().catch(err => {
     summaryEl.textContent = "Init error:\n" + err;
-    statusEl.textContent = "Error during initialization. See details in output box.";
+    statusEl.textContent = "Fejl under initialisering. Se detaljer i output.";
     console.error(err);
   });
 </script>

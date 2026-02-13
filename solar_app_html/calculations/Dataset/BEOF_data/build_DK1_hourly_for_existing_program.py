@@ -195,13 +195,10 @@ def main() -> None:
     spot["price_dkk_per_kwh"] = spot["SpotPriceDKK"] / 1000.0
     spot["price_ore_per_kwh"] = spot["price_dkk_per_kwh"] * 100.0
 
-    # Tariffs (optional: keep for inspection, but do NOT use for buy price)
-    tariffs = load_beof_tariffs_hourly()
-    out = spot.merge(tariffs, left_index=True, right_index=True, how="left")
-
     # Tariffs
     tariffs = load_beof_tariffs_hourly()
     out = spot.merge(tariffs, left_index=True, right_index=True, how="left")
+
 
     # Spot component (DKK/kWh) used in the final price:
     # Option A (closest to "Nordpool incl moms" style): spot*VAT + addon
@@ -222,17 +219,31 @@ def main() -> None:
     out["sell_price_dkk_per_kwh"] = out["price_dkk_per_kwh"] - BEOF_SELL_DEDUCTION_DKK_PER_KWH
 
     # Ensure HourDK column exists (already in spot) and enforce required output headers
-    out = out.reset_index().rename(columns={"HourUTC": "HourUTC"})
+    out = out.reset_index()
+
     out = out[[
         "HourUTC",
         "HourDK",
         "PriceArea",
+
+        # raw spot
+        "SpotPriceDKK",
         "price_dkk_per_kwh",
         "price_ore_per_kwh",
-        "SpotPriceDKK",
+
+        # tariffs needed for scenario recalculation in the app
+        "elnet",
+        "energinet",
+        "elafgift",
+
+        # recommended (so app doesn't need to recompute)
+        "spot_component_dkk_per_kwh",
+
+        # final buy/sell (still useful)
         "buy_price_dkk_per_kwh",
         "sell_price_dkk_per_kwh",
     ]].sort_values("HourUTC")
+
 
     out.to_csv(OUT_CSV, index=False)
     print(f"Saved {len(out)} rows to {OUT_CSV}")

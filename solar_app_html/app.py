@@ -646,6 +646,7 @@ def api_simulate_year(
     az: float = Query(180.0),
     annual_kwh: float = Query(4200.0),
     year: int = Query(2025),
+    price_scenario: str = Query("2026_projection"),  # "2025_real" | "2026_projection"
 
     # Battery params
     battery_kwh: float = Query(0.0),
@@ -694,6 +695,38 @@ def api_simulate_year(
 
     maskp = (price_df.index >= start_utc) & (price_df.index < end_utc)
     price_year = price_df.loc[maskp].reindex(pv_df.index)
+
+    # ---------- Price scenario handling (override buy price) ----------
+    ELAFGIFT_2025_REAL = 0.72
+    ELAFGIFT_2026_PROJ = 0.01
+
+    elafgift_used = ELAFGIFT_2026_PROJ if price_scenario != "2025_real" else ELAFGIFT_2025_REAL
+
+    # Needs these columns available from your CSV reader:
+    for col in ("elnet", "energinet"):
+        if col not in price_year.columns:
+            raise RuntimeError(f"Price CSV missing required column '{col}'. Rebuild CSV to include it.")
+
+    VAT_FACTOR = 1.25
+    FIXED_ADDON_DKK_PER_KWH = 0.0625
+
+    if "spot_component_dkk_per_kwh" in price_year.columns:
+        spot_component = price_year["spot_component_dkk_per_kwh"].astype(float)
+    else:
+        if "SpotPriceDKK" not in price_year.columns:
+            raise RuntimeError("Price CSV missing 'SpotPriceDKK' (needed to compute spot component).")
+        price_dkk_per_kwh = price_year["SpotPriceDKK"].astype(float) / 1000.0
+        spot_component = price_dkk_per_kwh * VAT_FACTOR + FIXED_ADDON_DKK_PER_KWH
+
+    price_year = price_year.copy()
+    price_year["buy_price_dkk_per_kwh"] = (
+        spot_component
+        + price_year["elnet"].astype(float)
+        + price_year["energinet"].astype(float)
+        + float(elafgift_used)
+    )
+    # ---------------------------------------------------------------
+
 
     df = load_year.join(price_year, how="inner").join(pv_df, how="left")
     df["pv_kwh"] = df["pv_kwh"].fillna(0.0)

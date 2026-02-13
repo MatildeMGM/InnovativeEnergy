@@ -13,14 +13,27 @@ def read_consumption_scaled(path: str) -> pd.DataFrame:
     return df[["load_kwh"]].copy()
 
 def read_prices(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path, parse_dates=[0], index_col=0)
-    df.index = pd.to_datetime(df.index, utc=True)
+    df = pd.read_csv(path)
 
-    req = ["buy_price_dkk_per_kwh", "sell_price_dkk_per_kwh"]
-    missing = [c for c in req if c not in df.columns]
-    if missing:
-        raise ValueError(f"Price file missing columns: {missing}")
-    return df[req].copy()
+    df["HourUTC"] = pd.to_datetime(df["HourUTC"], utc=True, errors="coerce")
+    df = df.dropna(subset=["HourUTC"]).set_index("HourUTC").sort_index()
+
+    keep = [
+        "buy_price_dkk_per_kwh",
+        "sell_price_dkk_per_kwh",
+        "SpotPriceDKK",
+        "elnet",
+        "energinet",
+        "elafgift",
+        "spot_component_dkk_per_kwh",
+    ]
+    for c in keep:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # only return columns that actually exist (so it won't crash if you temporarily miss one)
+    present = [c for c in keep if c in df.columns]
+    return df[present].copy()
 
 def energy_kwh_from_power(power_w: pd.Series) -> pd.Series:
     idx = power_w.index

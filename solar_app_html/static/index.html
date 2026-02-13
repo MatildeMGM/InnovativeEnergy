@@ -404,12 +404,12 @@
       <div class="modalBody">
         <div class="modalGrid">
           <div class="modalPanel">
-            <div class="small"><b>Energi balance (kWh)</b></div>
+            <div class="small"><b>Estimeret El-Energi balance (kWh)</b></div>
             <canvas id="chartMonthlyEnergy"></canvas>
           </div>
 
           <div class="modalPanel">
-            <div class="small"><b>Omkostninger og besparelser (DKK)</b></div>
+            <div class="small"><b>Estimerede omkostninger og besparelser (DKK)</b></div>
             <canvas id="chartMonthlyCost"></canvas>
           </div>
         </div>
@@ -704,9 +704,9 @@
       data: {
         labels,
         datasets: [
-          { label: "Basisomkostninger (uden Solpanel) (DKK)", data: m.baseline_cost_dkk },
-          { label: "Omkostninger med Solpanel (DKK)", data: m.system_cost_dkk },
-          { label: "Estimerede besparelser (DKK)", data: m.savings_dkk }
+          { label: "Årlige elomkostninger uden solceller (DKK)", data: m.baseline_cost_dkk },
+          { label: "Årlige elomkostninger med solceller (DKK)", data: m.system_cost_dkk },
+          { label: "Besparelser (DKK)", data: m.savings_dkk }
         ]
       },
       options: {
@@ -740,13 +740,13 @@
         </summary>
         <div class="body">
           <details class="section" open>
-            <summary>Totals</summary>
+            <summary>Estimerede beregninger</summary>
             <div class="body">
               <div class="row2">
-                <div class="k">Basisomkostninger (uden Solpanel)</div>
+                <div class="k">Årlige elomkostninger <b>uden</b> solceller</div>
                 <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
 
-                <div class="k">Omkostninger med Solpanel</div>
+                <div class="k">Årlige elomkostninger <b>med</b> solceller</div>
                 <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
 
                 <div class="k">Besparelser</div>

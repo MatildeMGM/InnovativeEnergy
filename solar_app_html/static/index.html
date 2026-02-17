@@ -198,6 +198,56 @@
       background: #d7e5ff;
     }
 
+    /* Disabled state */
+    .btn-main:disabled,
+    .btn-main[disabled]{
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Loading state (button) */
+    .btn-loading{
+      position: relative;
+      pointer-events: none; /* prevent double click */
+      opacity: 0.9;
+    }
+
+    /* Subtle pulse while loading */
+    .btn-loading{
+      animation: btnPulse 1.1s ease-in-out infinite;
+    }
+
+    @keyframes btnPulse{
+      0%   { filter: brightness(1); }
+      50%  { filter: brightness(0.92); }
+      100% { filter: brightness(1); }
+    }
+
+    /* Spinner */
+    .btn-spinner{
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 10px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.55);
+      border-top-color: rgba(255,255,255,1);
+      animation: spin 0.8s linear infinite;
+      vertical-align: -2px;
+    }
+
+    @keyframes spin{
+      to { transform: rotate(360deg); }
+    }
+
+    /* If you use spinner inside the LIGHT blue button, swap to dark spinner */
+    .btn-overview.btn-loading .btn-spinner,
+    .btn-overview .btn-spinner{
+      border-color: rgba(31,63,143,0.35);
+      border-top-color: rgba(31,63,143,1);
+    }
+
 
     /* Guide button (bigger, softer look) */
     .btn-guide {
@@ -1096,13 +1146,20 @@
   const etaDEl = document.getElementById("eta_d");
 
   const priceScenarioEl = document.getElementById("price_scenario");
+  const btnSummary = document.getElementById("btnSummary");
+  const btnMonthly = document.getElementById("btnMonthly");
 
+  let hasResults = false;
   let selected = null;
   let marker = null;
 
   let lastYearSim = null;
   let chartMonthlyEnergy = null;
   let chartMonthlyCost = null;
+  let lastComputedScenario = null;   // e.g. "2025_real" / "2026_projection"
+  let lastComputedYear = null;       // 2025 / 2026 (display year)
+  let isCalculating = false;
+
 
   let lastSummary = null;
 
@@ -1111,6 +1168,34 @@
     if (!r.ok) throw new Error(await r.text());
     return await r.json();
   }
+
+  function setMonthlyEnabled(enabled){
+    btnMonthly.disabled = !enabled;
+    btnMonthly.title = enabled ? "" : "Kør først “Opdater oversigt” for at åbne samlet oversigt.";
+  }
+
+  function setUpdateLoading(isLoading){
+    if (!btnSummary) return;
+
+    if (isLoading){
+      btnSummary.classList.add("btn-loading");
+      btnSummary.disabled = true;
+
+      // Save original text once
+      if (!btnSummary.dataset.originalText){
+        btnSummary.dataset.originalText = btnSummary.textContent.trim();
+      }
+
+      btnSummary.innerHTML = `<span class="btn-spinner"></span>Beregner…`;
+    } else {
+      btnSummary.classList.remove("btn-loading");
+      btnSummary.disabled = false;
+
+      const original = btnSummary.dataset.originalText || "Opdater oversigt";
+      btnSummary.textContent = original;
+    }
+  }
+
 
   async function printMonthlyOverview() {
     populateMonthlyOverview();
@@ -1312,7 +1397,8 @@
 
   function renderSimulationYear(data) {
     const s = data.summary;
-    const year = getDisplayYear();
+    const year = getUiYear();
+    const staleBadge = isUiStale() ? `<span class="warnPill">Ikke opdateret</span>` : "";
 
     function fmt(x, digits = 2) {
       if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
@@ -1326,7 +1412,7 @@
     simYearEl.innerHTML = `
       <details class="section">
         <summary>
-          Årlig simulation (${year})
+          Årlig simulation (${year} ${staleBadge})
           <span class="badge">${fmt(s.savings_dkk)} DKK</span>
         </summary>
         <div class="body">
@@ -1417,10 +1503,15 @@
     }
 
     const s = yearSimData.summary;
-    const year = yearSimData.inputs?.year ?? "—";
+    const displayYear = getUiYear();
+    const staleNote = isUiStale()
+      ? `<div class="small" style="margin-top:6px; color:#7a5c00;">
+          Værdierne er ikke opdateret til valgt pris-scenarie endnu. Tryk “Opdater oversigt”.
+        </div>`
+      : "";
 
     return `
-      <div class="docTitle">Årlig Simulation (Estimat) ${year}</div>
+      <div class="docTitle">Årlig Simulation (Estimat) ${displayYear}</div>
       <div class="docMeta">Omkostninger inkluderer spot + tariffer (jf. valgt pris-scenarie).</div>
 
       <div class="kvDoc">
@@ -1444,6 +1535,8 @@
 
         <div class="k">Selvforsyningsgrad</div>
         <div class="v">${fmtPct(s.self_sufficiency)}</div>
+        
+        ${staleNote}
       </div>
     `;
   }
@@ -1487,7 +1580,7 @@
             <div class="body">
               <div class="row2">
                 <div class="k">Årlig total (TMY/PVGIS)</div>
-                <div class="v">${yearKwh} kWh (år ${getDisplayYear()})</div>
+                <div class="v">${yearKwh} kWh (år ${getUiYear()})</div>
               </div>
             </div>
           </details>
@@ -2373,8 +2466,10 @@
         return;
       }
 
+      setUpdateLoading(true);
+      setMonthlyEnabled(false);
       statusEl.textContent = "Beregner resultater…";
-      
+
       const params = new URLSearchParams({
         lat: selected.lat,
         lon: selected.lon,
@@ -2386,30 +2481,26 @@
       });
 
       params.set("price_scenario", priceScenarioEl.value);
-
-      try {
-        bevaringskodeEl.innerHTML = "<div class='small'>Looking up Bevaringskode…</div>";
-        const bk = await getJSON(`/api/bevaringskode?lat=${selected.lat}&lon=${selected.lon}`);
-        renderBevaringskode(bk);
-      } catch (e) {
-        bevaringskodeEl.innerHTML = "<div class='small'>Bevaringskode lookup failed.</div>";
-      }
-
       addBatteryParams(params);
 
-      // show some progress in the UI (optional but nice)
-      if (typeof simYearEl !== "undefined" && simYearEl) simYearEl.innerHTML = "<div class='small'>Running yearly simulation…</div>";
+      // Optional: progress text
+      if (simYearEl) simYearEl.innerHTML = "<div class='small'>Running yearly simulation…</div>";
 
       try {
+        // Bevaringskode (non-fatal if it fails)
+        try {
+          bevaringskodeEl.innerHTML = "<div class='small'>Looking up Bevaringskode…</div>";
+          const bk = await getJSON(`/api/bevaringskode?lat=${selected.lat}&lon=${selected.lon}`);
+          renderBevaringskode(bk);
+        } catch (e) {
+          bevaringskodeEl.innerHTML = "<div class='small'>Bevaringskode lookup failed.</div>";
+        }
         // 1) PV summary
         const summary = await getJSON(`/api/summary?${params.toString()}`);
         lastSummary = summary;
-        renderSummary(summary);
 
-        // 2) Day simulation (removed function)
-
-        // 3) Year simulation
-        const year = "2025";
+        // 3) Year simulation (FETCH ONCE)
+        const year = "2025"; // keep const year (backend needs this)
         const yearParams = new URLSearchParams({
           lat: selected.lat,
           lon: selected.lon,
@@ -2424,22 +2515,40 @@
         yearParams.set("price_scenario", priceScenarioEl.value);
         addBatteryParams(yearParams);
 
-        lastYearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
         const yearSim = await getJSON(`/api/simulate_year?${yearParams.toString()}`);
-        renderSimulationYear(yearSim);
+        lastYearSim = yearSim;
+
+        // IMPORTANT: update "computed" markers BEFORE rendering,
+        // so the "Ikke Opdateret" warning doesn't linger until a 2nd click.
+        lastComputedScenario = priceScenarioEl.value;
+        lastComputedYear = getDisplayYear(); // or scenarioToYear(lastComputedScenario) if you use that helper
+
+        // Render after computed markers are set
+        renderSummary(lastSummary);
+        renderSimulationYear(lastYearSim);
+
+        // Make sure labels/buttons match the *UI year* you want to show
+        refreshYearLabels();
 
         statusEl.textContent = "Alle resultater opdateret.";
+        hasResults = true;
+        setMonthlyEnabled(true);
+
+
       } catch (err) {
         statusEl.textContent = "Fejl under beregning af resultater.";
+        hasResults = false;
+        setMonthlyEnabled(false);
         console.error(err);
 
-        // show errors in the boxes if present
         if (typeof simEl !== "undefined" && simEl) {
           simEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
         }
         if (typeof simYearEl !== "undefined" && simYearEl) {
           simYearEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
         }
+      } finally {
+        setUpdateLoading(false);
       }
     };
 
@@ -2459,6 +2568,7 @@
 
     // Monthly overview button
     document.getElementById("btnMonthly").onclick = () => {
+      if (btnMonthly.disabled) return;
       try {
         // Charts
         renderMonthlyCharts(lastYearSim);
@@ -2480,13 +2590,38 @@
       }
     };
 
-    priceScenarioEl.addEventListener("change", () => {
-      refreshYearLabels();
-    });
+  priceScenarioEl.addEventListener("change", () => {
+    // Do NOT change year labels to the new year yet.
+    // Instead, re-render sections so they can show "Ikke opdateret" if stale.
+    if (lastSummary) renderSummary(lastSummary);
+    if (lastYearSim) renderSimulationYear(lastYearSim);
+
+    // Optional: also lock the monthly button title/text to computed year
+    refreshYearLabels(); // but make refreshYearLabels use getUiYear() (next section)
+  });
 
     refreshYearLabels();
 
   }
+
+  function scenarioToYear(sc){
+    if (sc === "2025_real") return 2025;
+    if (sc === "2026_projection") return 2026;
+    return 2025;
+  }
+
+  function getUiYear(){
+    // show the last computed year (safe), fallback to current selection only if never computed yet
+    if (lastComputedYear) return lastComputedYear;
+    return scenarioToYear(priceScenarioEl?.value);
+  }
+
+  function isUiStale(){
+    // stale if user changed dropdown after last successful compute
+    return lastComputedScenario && priceScenarioEl?.value !== lastComputedScenario;
+  }
+
+  setMonthlyEnabled(false);
 
   init().catch(err => {
     summaryEl.textContent = "Init error:\n" + err;

@@ -30,7 +30,6 @@
     .row { margin-bottom: 10px; }
     label { display: block; font-size: 12px; color: #444; margin-bottom: 4px; }
     input, select { width: 100%; padding: 6px; box-sizing: border-box; }
-    button { padding: 10px; width: 100%; margin-bottom: 8px; }
     pre { background: #dddddd; padding: 10px; white-space: pre-wrap; }
 
     .small { font-size: 12px; color: #555; }
@@ -158,6 +157,70 @@
       line-height: 1.35;
     }
 
+    /* ===== Base Button Style ===== */
+    .btn-main {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 10px;
+    }
+
+    .btn-main:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-main:active {
+      transform: translateY(0);
+    }
+
+    .btn-update {
+      background: #2f6fed;
+      border-color: #2f6fed;
+      color: #ffffff;
+    }
+
+    .btn-update:hover {
+      background: #255bd6;
+    }
+
+    .btn-overview {
+      background: #e8f0ff;
+      border-color: #2f6fed;
+      color: #1f3f8f;
+    }
+
+    .btn-overview:hover {
+      background: #d7e5ff;
+    }
+
+
+    /* Guide button (bigger, softer look) */
+    .btn-guide {
+      width: 100%;
+      padding: 14px 16px;         /* larger than normal */
+      font-size: 15px;            /* slightly larger text */
+      font-weight: 700;
+      border-radius: 12px;
+      border: 2px solid #8db87c;
+      background: #f4faef;        /* very light green background */
+      color: #2f5f2f;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-guide:hover {
+      background: #e4f3db;
+      transform: translateY(-1px);
+    }
+
+    .btn-guide:active {
+      transform: translateY(0);
+    }
 
     /* Tooltip */
     .qm {
@@ -767,26 +830,29 @@
           <!-- RIGHT: images/screenshots (placeholders you can replace) -->
           <div class="docCard">
             <h2 class="docTitle">Screenshots / Eksempler</h2>
-            <div class="docMeta">Du kan udskifte felterne her med dine egne screenshots.</div>
-
             <div class="guideImgGrid">
               <figure class="guideFigure">
-                <div class="imgPlaceholder">Screenshot 1<br><span class="small">Vælg lokation / adresse-søgning</span></div>
+                <img class="guideImg" src="/static/screenshots/Location_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: vælg punkt på kortet.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <div class="imgPlaceholder">Screenshot 2<br><span class="small">Inputs (grund)</span></div>
+                <img class="guideImg" src="/static/screenshots/Azimuth_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <figcaption class="small">Eksempel: Vælg Azimuth.</figcaption>
+              </figure>
+
+              <figure class="guideFigure">
+                <img class="guideImg" src="/static/screenshots/Settings_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: udfyld kWh/år og kWp.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <div class="imgPlaceholder">Screenshot 3<br><span class="small">Månedlig oversigt</span></div>
+                <img class="guideImg" src="/static/screenshots/Output_Grafer.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: læs kWh- og DKK-grafer.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <div class="imgPlaceholder">Screenshot 4<br><span class="small">Lokalplaner</span></div>
+                <img class="guideImg" src="/static/screenshots/Output_Planer.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: links og relevante uddrag.</figcaption>
               </figure>
             </div>
@@ -802,9 +868,7 @@
 
 
   <div id="side">
-    <h1>Inputs</h1>
-    <h3>(Indsæt vejledning / dokumentation)</h3>
-
+    <h1>Inputs</h1> 
     <details class="section" open>
       <summary>Indstillinger for anlæg</summary>
       <div class="body">
@@ -973,10 +1037,17 @@
       </div>
     </details>
 
+    <button id="btnSummary" class="btn-main btn-update">
+      Opdater oversigt
+    </button>
 
-    <button id="btnGuide">Brugervejledning</button>
-    <button id="btnSummary">Opdater oversigt</button>
-    <button id="btnMonthly">Samlet oversigt</button>
+    <button id="btnMonthly" class="btn-main btn-overview">
+      Samlet oversigt
+    </button>
+
+    <button id="btnGuide" class="btn-guide">
+      Brugervejledning
+    </button>
 
     <div class="hr"></div>
     <h1>Outputs</h1>
@@ -1430,16 +1501,6 @@
 
                 <div class="k">Peak Solpanel effekt</div>
                 <div class="v">${peakPower} W</div>
-              </div>
-            </div>
-          </details>
-
-          <details class="section" open>
-            <summary>Energi (el) resultater</summary>
-            <div class="body">
-              <div class="row2">
-                <div class="k">Årlig total (TMY/PVGIS)</div>
-                <div class="v">${yearKwh} kWh (år ${getDisplayYear()})</div>
               </div>
             </div>
           </details>

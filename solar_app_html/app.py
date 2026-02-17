@@ -44,7 +44,7 @@ BUILTIN_LAYER_IDS = {"bornholm", "planer"}  # served from memory, not from file
 
 DATA_DIR = Path(__file__).resolve().parent / "calculations/Dataset/BEOF_data"
 CONSUMPTION_PATH = DATA_DIR / "consumption_private_scaled_hourly_2025.csv"
-PRICES_PATH = DATA_DIR / "DK1_2025_hourly_for_program.csv"
+PRICES_PATH = DATA_DIR / "DK2_2025_hourly_for_program.csv"
 
 
 # ----------------------------

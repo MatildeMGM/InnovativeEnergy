@@ -32,7 +32,7 @@ DAYAHEAD_15MIN_BASE = (
 )
 BEOF_URL = "https://beof.dk/wp-json/beof/v1/tariffs?start_date=2025-01-01T00:00&end_date=2025-12-31T24:00"
 
-OUT_CSV = "DK1_2025_hourly_for_program.csv"
+OUT_CSV = "DK2_2025_hourly_for_program.csv"
 
 # JS-style “Nordpool” transformation (from your JS)
 

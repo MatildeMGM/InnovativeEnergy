@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>PV Map (Local)</title>
+  <title>Energi Borhnolm</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -176,27 +176,6 @@
       user-select: none;
     }
 
-    .qm::after {
-      content: attr(data-tip);
-      position: absolute;
-      left: 0px;
-      top: 22px;
-      min-width: 220px;
-      max-width: 320px;
-      white-space: normal;
-      background: #111;
-      color: #fff;
-      padding: 8px 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      line-height: 1.3;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(4px);
-      transition: opacity 0.15s ease, transform 0.15s ease;
-      z-index: 9999;
-    }
-
     .qm:hover::after {
       opacity: 1;
       transform: translateY(0);
@@ -273,7 +252,7 @@
       justify-self: end;
     }
 
-    /* Modal */
+    /* Modal */    
     .modal {
       position: fixed;
       inset: 0;
@@ -321,6 +300,271 @@
       padding: 10px;
       background: #fff;
     }
+
+    /* ===== Guide modal layout ===== */
+    .guideDoc{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 900px){
+      .guideDoc{ grid-template-columns: 1fr; }
+    }
+
+    .guideSteps{
+      display: grid;
+      gap: 10px;
+    }
+
+    .guideStep{
+      border: 1px solid #e6e6e6;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fafafa;
+    }
+
+    .guideStepTitle{
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .guideStepText{
+      font-size: 13px;
+      color: #111;
+      line-height: 1.4;
+    }
+
+    .guideImgGrid{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .guideFigure{
+      margin: 0;
+    }
+
+    .imgPlaceholder{
+      width: 100%;
+      height: 160px;
+      border-radius: 10px;
+      border: 2px dashed #ccc;
+      background: #f7f7f7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #666;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    /* Print guide modal only */
+    @media print{
+      body.print-guide #side,
+      body.print-guide #map{
+        display: none !important;
+      }
+
+      body.print-guide #wrap{
+        display: block !important;
+        height: auto !important;
+      }
+
+      body.print-guide #guideModal{
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        background: none !important;
+      }
+
+      body.print-guide .modalCard{
+        width: 100% !important;
+        max-height: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+
+      body.print-guide .modalBody{
+        overflow: visible !important;
+      }
+
+      body.print-guide .modalClose{
+        display: none !important;
+      }
+    }
+
+
+    /* ===== Modal document layout ===== */
+    .overviewDoc{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* Nice “document card” look */
+    .docCard{
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .docTitle{
+      font-weight: 800;
+      margin: 0 0 8px 0;
+    }
+
+    .docMeta{
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    .kvDoc{
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 6px 10px;
+      font-size: 13px;
+    }
+    .kvDoc .k{ color:#555; font-size:12px; }
+    .kvDoc .v{ color:#111; }
+
+    @media (max-width: 900px) {
+      .overviewDoc{ grid-template-columns: 1fr; }
+    }
+
+    /* Print: make sure the two columns still look good */
+    @media print {
+      body.print-modal .overviewDoc{
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media print {
+      body.print-modal #overviewPlansSection{
+        break-before: page;
+        page-break-before: always;
+      }
+    }
+
+    /* ===== Print modal only ===== */
+    @media print {
+      /* Keep wrap (it contains the modal), but remove sidebar + map */
+      body.print-modal #side,
+      body.print-modal #map {
+        display: none !important;
+      }
+
+      /* Make wrap a normal block so the modal can flow */
+      body.print-modal #wrap {
+        display: block !important;
+        height: auto !important;
+      }
+
+      /* Force modal visible (overrides inline style="display:none") */
+      body.print-modal #monthlyModal {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        background: none !important;
+      }
+
+
+
+      body.print-modal .modalCard {
+        width: 100% !important;
+        max-height: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+
+      body.print-modal .modalBody {
+        overflow: visible !important;
+      }
+
+      /* optional: hide buttons on paper */
+      body.print-modal .modalClose {
+        display: none !important;
+      }
+    }
+
+    /* ===== Plans document layout in modal ===== */
+    .plansDocGrid{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* A “section header” inside doc cards */
+    .docSectionTitle{
+      font-weight: 800;
+      margin: 0 0 8px 0;
+    }
+
+    /* Clean list formatting */
+    .docList{
+      margin: 0;
+      padding-left: 16px;
+    }
+    .docList li{
+      margin: 6px 0;
+    }
+
+    /* Link look (screen) */
+    .docCard a{
+      color: #0b57d0;
+      text-decoration: none;
+    }
+    .docCard a:hover{
+      text-decoration: underline;
+    }
+
+    /* Simple “plan box” for each found plan */
+    .planDocItem{
+      border: 1px solid #e6e6e6;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fafafa;
+      margin-top: 10px;
+    }
+    .planDocName{
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .planDocMeta{
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    /* Mobile: stack */
+    @media (max-width: 900px) {
+      .plansDocGrid{ grid-template-columns: 1fr; }
+    }
+
+    /* ===== Print: keep columns + make URLs visible and links clickable ===== */
+    @media print {
+      body.print-modal .plansDocGrid{
+        grid-template-columns: 1fr 1fr;
+      }
+
+      /* Make sure links are underlined in print */
+      .docCard a{
+        color: #000 !important;
+        text-decoration: underline !important;
+      }
+
+      /* Show the URL text so the PDF contains it (still clickable in most browsers) */
+      .docCard a[href]::after{
+        content: " (" attr(href) ")";
+        font-size: 10px;
+        color: #444;
+        word-break: break-all;
+      }
+    }
+
 
     /* ===== Fix Leaflet layers control being affected by global form styles ===== */
     .leaflet-control-layers input,
@@ -397,12 +641,24 @@
   <div id="monthlyModal" class="modal" style="display:none;">
     <div class="modalCard">
       <div class="modalHeader">
-        <div id="monthlyTitle" style="font-weight:700;">Månedlig oversigt</div>
-        <button id="btnMonthlyClose" class="modalClose">Close</button>
+        <div id="monthlyTitle" style="font-weight:700;">Samlet oversigt</div>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="btnMonthlyPrint" class="modalClose">Udskriv</button>
+          <button id="btnMonthlyClose" class="modalClose">Luk</button>
+        </div>
       </div>
 
       <div class="modalBody">
-        <div class="modalGrid">
+
+        <!-- NEW: document-style top (2 columns) -->
+        <div id="overviewDoc" class="overviewDoc">
+          <div id="overviewLeft" class="docCard"></div>
+          <div id="overviewRight" class="docCard"></div>
+        </div>
+
+        <!-- Your existing charts grid -->
+        <div class="modalGrid" style="margin-top:12px;">
           <div class="modalPanel">
             <div class="small"><b>Estimeret El-Energi balance (kWh)</b></div>
             <canvas id="chartMonthlyEnergy"></canvas>
@@ -413,9 +669,138 @@
             <canvas id="chartMonthlyCost"></canvas>
           </div>
         </div>
+
+        <!-- NEW: plans printed in the modal -->
+        <div id="overviewPlansSection">
+          <div class="modalPanel" style="margin-top:12px;">
+            <div class="small"><b>Lokalplaner og vejledning</b></div>
+
+            <div id="overviewPlansGrid" class="plansDocGrid">
+              <div id="overviewPlansLeft" class="docCard"></div>
+              <div id="overviewPlansRight" class="docCard"></div>
+            </div>
+          </div>
+        </div>
+
+
       </div>
     </div>
-  </div>  
+  </div>
+
+  <!-- User Guide modal -->
+  <div id="guideModal" class="modal" style="display:none;">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div style="font-weight:700;">Brugervejledning</div>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="btnGuidePrint" class="modalClose">Udskriv</button>
+          <button id="btnGuideClose" class="modalClose">Luk</button>
+        </div>
+      </div>
+
+      <div class="modalBody">
+        <div class="guideDoc">
+          <!-- LEFT: steps/explanations -->
+          <div class="docCard">
+            <h2 class="docTitle">Sådan bruger du værktøjet</h2>
+            <div class="docMeta">
+              Følg trinene her for at lave en beregning og forstå resultaterne.
+            </div>
+
+            <div class="guideSteps">
+              <div class="guideStep">
+                <div class="guideStepTitle">1) Vælg lokation</div>
+                <div class="guideStepText">
+                  Klik på kortet, eller brug adresse-søgningen. Markøren viser det valgte punkt.
+                  Når lokationen er valgt, tryk på <b>“Opdater oversigt”</b>.
+                </div>
+              </div>
+
+              <div class="guideStep">
+                <div class="guideStepTitle">2) Udfyld grundindstillinger</div>
+                <div class="guideStepText">
+                  <ul class="docList">
+                    <li><b>Årligt forbrug:</b> dit elforbrug pr. år (kWh/år).</li>
+                    <li><b>Solpanel størrelse (kWp):</b> anlæggets installerede effekt.</li>
+                    <li><b>Batteri (kWh):</b> 0 hvis du ikke har batteri.</li>
+                    <li><b>Pris-scenarie:</b> påvirker kun omkostninger/besparelser (DKK).</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guideStep">
+                <div class="guideStepTitle">3) (Valgfrit) Avancerede indstillinger</div>
+                <div class="guideStepText">
+                  Brug standardværdier hvis du er i tvivl. Justér kun hvis du kender dine forhold:
+                  <ul class="docList">
+                    <li><b>PR:</b> samlet systemeffektivitet (typisk 0,75–0,85).</li>
+                    <li><b>Hældning &amp; Azimuth:</b> tagets orientering.</li>
+                    <li><b>SoC min/max:</b> batteribegrænsninger for levetid.</li>
+                    <li><b>Effektgrænser (kW):</b> hvis inverter/batteri har begrænsninger.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guideStep">
+                <div class="guideStepTitle">4) Forstå output</div>
+                <div class="guideStepText">
+                  <ul class="docList">
+                    <li><b>Solpanel Resultater:</b> forventet årlig produktion (kWh/år) og peak-værdier.</li>
+                    <li><b>Årlig Simulation:</b> omkostninger uden/med solceller samt besparelse.</li>
+                    <li><b>Månedlig oversigt:</b> grafer for energi (kWh) og økonomi (DKK).</li>
+                    <li><b>Lokalplaner:</b> standard vejledning + evt. relevante planer for lokationen.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guideStep">
+                <div class="guideStepTitle">Tip</div>
+                <div class="guideStepText">
+                  Start med standardværdier og ændr én ting ad gangen (kWp, azimuth, batteri)
+                  for at se hvordan resultatet ændrer sig.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: images/screenshots (placeholders you can replace) -->
+          <div class="docCard">
+            <h2 class="docTitle">Screenshots / Eksempler</h2>
+            <div class="docMeta">Du kan udskifte felterne her med dine egne screenshots.</div>
+
+            <div class="guideImgGrid">
+              <figure class="guideFigure">
+                <div class="imgPlaceholder">Screenshot 1<br><span class="small">Vælg lokation / adresse-søgning</span></div>
+                <figcaption class="small">Eksempel: vælg punkt på kortet.</figcaption>
+              </figure>
+
+              <figure class="guideFigure">
+                <div class="imgPlaceholder">Screenshot 2<br><span class="small">Inputs (grund)</span></div>
+                <figcaption class="small">Eksempel: udfyld kWh/år og kWp.</figcaption>
+              </figure>
+
+              <figure class="guideFigure">
+                <div class="imgPlaceholder">Screenshot 3<br><span class="small">Månedlig oversigt</span></div>
+                <figcaption class="small">Eksempel: læs kWh- og DKK-grafer.</figcaption>
+              </figure>
+
+              <figure class="guideFigure">
+                <div class="imgPlaceholder">Screenshot 4<br><span class="small">Lokalplaner</span></div>
+                <figcaption class="small">Eksempel: links og relevante uddrag.</figcaption>
+              </figure>
+            </div>
+
+            <!-- Optional: real images later
+            <img class="guideImg" src="img/step1.png" alt="Step 1">
+            -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div id="side">
     <h1>Inputs</h1>
     <h3>(Indsæt vejledning / dokumentation)</h3>
@@ -423,40 +808,51 @@
     <details class="section" open>
       <summary>Indstillinger for anlæg</summary>
       <div class="body">
+
         <div class="row">
-          <label><b>Årlig forbrug (kWh/år)</b></label>
+          <label>
+            <b>Årlig forbrug (kWh/år)</b>
+            <span class="qm" data-tip="Indtast husstandens samlede elforbrug pr. år. Kan typisk findes på din årsopgørelse fra elselskabet.">?</span>
+          </label>
           <input id="annual_kwh" type="number" value="4200" step="100" min="0">
-          <label>Indtast dit årlige forbrug (husstand)</label>
           <div class="hr"></div>
         </div>
 
         <div class="row">
-          <label><b>Solpanel størrelse (kWp)</b></label>
+          <label>
+            <b>Solpanel størrelse (kWp)</b>
+            <span class="qm" data-tip="Installeret effekt af solcelleanlægget. 1 kWp svarer typisk til ca. 3–4 paneler afhængigt af paneltype.">?</span>
+          </label>
           <input id="kwp" type="number" step="0.1" value="1.0" min="0">
-          <label>Indtast størrelse for solpanel</label>
           <div class="hr"></div>
         </div>
 
         <div class="row">
-          <label><b>Batteri kapacitet (kWh) (0 = intet batteri)</b></label>
+          <label>
+            <b>Batteri kapacitet (kWh) (0 = intet batteri)</b>
+            <span class="qm" data-tip="Batteriets lagringskapacitet. 0 betyder ingen batterilagring. Typisk 5–15 kWh for parcelhuse.">?</span>
+          </label>
           <input id="batt_kwh" type="number" step="0.5" value="0" min="0">
-          <label>Indtast størrelse på batteripakke</label>
           <div class="hr"></div>
         </div>
 
         <div class="row">
-          <label><b>Pris-scenarie</b></label>
+          <label>
+            <b>Pris-scenarie</b>
+            <span class="qm" data-tip="2025: Faktiske historiske elpriser inkl. fuld elafgift (0,72 kr/kWh). 
+            2026: Fremskrevet scenarie baseret på 2025-markedspriser, men med reduceret elafgift på 0,01 kr/kWh for at afspejle kommende afgiftsændring.">?</span>
+          </label>
           <select id="price_scenario">
             <option value="2025_real" selected>2025 (Historisk: elafgift 0,72 dkk/kWh)</option>
             <option value="2026_projection">2026 (Fremskrevet: elafgift 0,01 dkk/kWh)</option>
           </select>
-          <label>Vælg mellem:</label> 
-          <label>2025 Historiske priser med elafgift på <b>0.72 dkk/kWh</b> </label> 
-          <label>2026 Fremskrevede priser som er baseret på priser fra 2025 med sænket elafgift på <b>0.01 dkk/kWh</b></label>
         </div>
 
         <div class="row" id="row_elafgift_custom" style="display:none;">
-          <label>Custom elafgift (DKK/kWh)</label>
+          <label>
+            Custom elafgift (DKK/kWh)
+            <span class="qm" data-tip="Bruges kun hvis du aktiverer et custom scenarie. Angiver elafgift i kr/kWh som lægges oveni spotpris og tariffer.">?</span>
+          </label>
           <input id="elafgift_custom" type="number" step="0.01" value="0.01" min="0">
         </div>
 
@@ -466,88 +862,110 @@
     <details class="section">
       <summary>Avancerede indstillinger</summary>
       <div class="body">
-        <label>Herunder findes avancerede instillinger for solpanel og batteri. Disse indstillinger kan til en hvis grad ignoreres hvis der blot ønskes en overslagsberegning. Beregningen bliver mere retvisende hvis avancerede indstillinger er sat korrekt.</label>
+        <label>
+          Herunder findes avancerede instillinger for solpanel og batteri. Disse indstillinger påvirker nøjagtigheden. Du kan ofte bruge standardværdierne til en overslagsberegning.
+        </label>
 
         <details class="section" open>
           <summary>Avancerede Solpanel indstillinger</summary>
           <div class="body">
-          <!-- PV advanced -->
+            <!-- PV advanced -->
 
-          <div class="row">
-            <label><b>Virkningsgrad (PR) (0.75 = 75%)</b></label>
-            <input id="pr" type="number" step="0.01" value="0.75" min="0" max="1.2">
-            <label>Virkningsgraden / Performance Ratio (PR) beskriver den overordnede effektivitet som solpanelet producerer elektricitet ved. Værdien vil typisk ligge mellem 0.75 til 0.85.</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Virkningsgrad (PR) (0.75 = 75%)</b>
+                <span class="qm" data-tip="Performance Ratio (PR) beskriver systemets samlede effektivitet inkl. tab i inverter, kabler, temperatur m.m. Typisk 0.75–0.85.">?</span>
+              </label>
+              <input id="pr" type="number" step="0.01" value="0.75" min="0" max="1.2">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Hældning (°)</b></label>
-            <input id="tilt" type="number" step="1" value="40">
-            <label>Tagets hældning har betydning for solpanelets effektivitet. Hældningen på dit tag kan eventuelt findes i plantegningerne for dit hus, eller kan måles manuelt</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Hældning (°)</b>
+                <span class="qm" data-tip="Tagets hældning i grader. Hældningen påvirker hvor meget solindstråling panelerne modtager over året.">?</span>
+              </label>
+              <input id="tilt" type="number" step="1" value="40">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Retning / azimuth (°) (180 = syd)</b></label>
-            <input id="az" type="number" step="1" value="180">
-            <label>Tagets retning / azimuth har betydning for solpanelets effektivitet. </label>
-            <label>Brug eventuelt værktøjet <b>"Mål retning / azimuth"</b> (nederst til venstre på kortet) til at bestemme denne vinkel på dit tag. Klik på værktøjet og derefter klik på tagryggen af dit hus - træk derefter pilen væk fra dit hus (helst mod syd) så den røde linje ligger langs tagryggen.</label>
-          </div>
+            <div class="row">
+              <label>
+                <b>Retning / azimuth (°) (180 = syd)</b>
+                <span class="qm" data-tip="Retning på taget: 0° = nord, 90° = øst, 180° = syd, 270° = vest. Brug måleværktøjet på kortet for at bestemme vinklen.">?</span>
+              </label>
+              <input id="az" type="number" step="1" value="180">
+            </div>
 
           </div>
         </details>
-        
+
         <details class="section" open>
           <summary>Avancerede Batteri indstillinger</summary>
           <div class="body">
             <!-- Battery advanced -->
-          <div class="row">
-            <label><b>Start SoC (0-1) (0.5 = 50% opladt)</b></label>
-            <input id="soc_init" type="number" step="0.05" value="0.5" min="0" max="1">
-            <label>State of Charge (SoC) bestemmer batteriets opladningsniveau når simuleringen startes.</label>
-            <div class="hr"></div>
-          </div>
 
-          <div class="row">
-            <label><b>Minimum SoC (0-1) (0.1 = 10% opladt)</b></label>
-            <input id="soc_min" type="number" step="0.05" value="0.1" min="0" max="1">
-            <label>Ved at begrænse minimum-opladningsniveau kan batteriets levetid forlænges</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Start SoC (0-1) (0.5 = 50% opladt)</b>
+                <span class="qm" data-tip="State of Charge ved simuleringens start. 0.5 betyder 50% opladet batteri.">?</span>
+              </label>
+              <input id="soc_init" type="number" step="0.05" value="0.5" min="0" max="1">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Maksimal SoC (0-1) (0.9 = 90% opladt)</b></label>
-            <input id="soc_max" type="number" step="0.05" value="0.9" min="0" max="1">
-            <label>Ved at begrænse maksimum-opladningsniveau kan batteriets levetid forlænges</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Minimum SoC (0-1) (0.1 = 10% opladt)</b>
+                <span class="qm" data-tip="Laveste tilladte opladningsniveau. Begrænser dybdeafladning og kan forlænge batteriets levetid.">?</span>
+              </label>
+              <input id="soc_min" type="number" step="0.05" value="0.1" min="0" max="1">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Maksimal opladningseffekt (kW) (blank = uendelig)</b></label>
-            <input id="p_charge_kw" type="number" step="0.5" value="" min="0">
-            <label>Den maksimale opladningseffekt beskriver den effekt som batteriet maksimalt kan oplades med. Denne værdi er typisk en begrænsning der er sat af solpanelets inverter.</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Maksimal SoC (0-1) (0.9 = 90% opladt)</b>
+                <span class="qm" data-tip="Højeste tilladte opladningsniveau. Begrænser fuldopladning og kan forlænge batteriets levetid.">?</span>
+              </label>
+              <input id="soc_max" type="number" step="0.05" value="0.9" min="0" max="1">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Maksimal afladningseffekt (kW) (blank = uendelig)</b></label>
-            <input id="p_discharge_kw" type="number" step="0.5" value="" min="0">
-            <label>Den maksimale afladningseffekt beskriver den effekt som batteriet maksimalt kan aflades med. Denne værdi er typisk en begrænsning der er sat af solpanelets inverter.</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Maksimal opladningseffekt (kW) (blank = uendelig)</b>
+                <span class="qm" data-tip="Maksimal effekt batteriet kan oplades med. Ofte begrænset af inverter eller batteristyring. Tomt felt betyder ingen begrænsning.">?</span>
+              </label>
+              <input id="p_charge_kw" type="number" step="0.5" value="" min="0">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Opladnings effektivitet (0-1) (0.95 = 95%)</b></label>
-            <input id="eta_c" type="number" step="0.01" value="0.95" min="0" max="1">
-            <label>Opladnings effektivitet er den energi, der tilføres batteriet, divideret med den energi, der bruges af opladeren.</label>
-            <div class="hr"></div>
-          </div>
+            <div class="row">
+              <label>
+                <b>Maksimal afladningseffekt (kW) (blank = uendelig)</b>
+                <span class="qm" data-tip="Maksimal effekt batteriet kan levere. Tomt felt betyder ingen begrænsning.">?</span>
+              </label>
+              <input id="p_discharge_kw" type="number" step="0.5" value="" min="0">
+              <div class="hr"></div>
+            </div>
 
-          <div class="row">
-            <label><b>Afladnings effektivitet (0-1) (0.95 = 95%)</b></label>
-            <input id="eta_d" type="number" step="0.01" value="0.95" min="0" max="1">
-            <label>Afladnings effektivitet er den energi, der leveres fra batteriet, divideret med den energi, der tappes fra batteriet.</label>
-          </div>
+            <div class="row">
+              <label>
+                <b>Opladnings effektivitet (0-1) (0.95 = 95%)</b>
+                <span class="qm" data-tip="Opladnings effektivitet er den energi, der tilføres batteriet, divideret med den energi, der bruges af opladeren.">?</span>
+              </label>
+              <input id="eta_c" type="number" step="0.01" value="0.95" min="0" max="1">
+              <div class="hr"></div>
+            </div>
+
+            <div class="row">
+              <label>
+                <b>Afladnings effektivitet (0-1) (0.95 = 95%)</b>
+                <span class="qm" data-tip="Afladnings effektivitet er den energi, der leveres fra batteriet, divideret med den energi, der tappes fra batteriet.">?</span>
+              </label>
+              <input id="eta_d" type="number" step="0.01" value="0.95" min="0" max="1">
+            </div>
 
           </div>
         </details>
@@ -556,8 +974,9 @@
     </details>
 
 
+    <button id="btnGuide">Brugervejledning</button>
     <button id="btnSummary">Opdater oversigt</button>
-    <button id="btnMonthly">Månedlig oversigt</button>
+    <button id="btnMonthly">Samlet oversigt</button>
 
     <div class="hr"></div>
     <h1>Outputs</h1>
@@ -622,6 +1041,18 @@
     return await r.json();
   }
 
+  async function printMonthlyOverview() {
+    populateMonthlyOverview();
+    openMonthlyModal();
+
+    // Let layout + charts paint before printing
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    document.body.classList.add("print-modal");
+    window.print();
+    document.body.classList.remove("print-modal");
+  }
+
   function getDisplayYear() {
     const sc = priceScenarioEl ? priceScenarioEl.value : null;
     if (sc === "2025_real") return 2025;
@@ -633,10 +1064,10 @@
     const y = getDisplayYear();
 
     const titleEl = document.getElementById("monthlyTitle");
-    if (titleEl) titleEl.textContent = `Månedlig oversigt (${y})`;
+    if (titleEl) titleEl.textContent = `Samlet oversigt (${y})`;
 
     const btnEl = document.getElementById("btnMonthly");
-    if (btnEl) btnEl.textContent = `Månedlig oversigt (${y})`;
+    if (btnEl) btnEl.textContent = `Samlet oversigt (${y})`;
   }
 
   function addBatteryParams(params) {
@@ -658,6 +1089,66 @@
   }
   function closeMonthlyModal() {
     document.getElementById("monthlyModal").style.display = "none";
+  }
+
+  function populateMonthlyOverview() {
+    const box = document.getElementById("modalOverview");
+    if (!box) return;
+
+    const coordText = (selected)
+      ? `${selected.lat.toFixed(5)}, ${selected.lon.toFixed(5)}`
+      : "—";
+
+    const yearText = (lastYearSim?.inputs?.year) ? String(lastYearSim.inputs.year) : "—";
+    const scenarioText = priceScenarioEl?.value ? escapeHtml(priceScenarioEl.value) : "—";
+
+    const summaryHtml = document.getElementById("summary")?.innerHTML || "<div class='small'>Ingen PV-oversigt endnu. Tryk “Opdater oversigt”.</div>";
+    const yearHtml = document.getElementById("simulationYear")?.innerHTML || "<div class='small'>Ingen årlig simulering endnu. Tryk “Opdater oversigt”.</div>";
+
+    box.innerHTML = `
+      <div class="small" style="margin-bottom:8px;">
+        <b>Valgt koordinat:</b> ${escapeHtml(coordText)}
+        <span style="margin-left:10px;"><b>År:</b> ${escapeHtml(yearText)}</span>
+        <span style="margin-left:10px;"><b>Pris-scenarie:</b> ${scenarioText}</span>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="margin-bottom:10px;">
+        ${summaryHtml}
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        ${yearHtml}
+      </div>
+    `;
+      document.getElementById("overviewLeft").innerHTML  = buildPvDocHtml(lastSummary);
+      document.getElementById("overviewRight").innerHTML = buildYearSimDocHtml(lastYearSim);
+      document.getElementById("overviewPlans").innerHTML = buildPlansHtml(lastSummary?.plan);
+
+      const std = buildStandardPlan();
+      document.getElementById("overviewPlansLeft").innerHTML  = buildStandardPlanDocHtml(std);
+      document.getElementById("overviewPlansRight").innerHTML = buildFoundPlansDocHtml(lastSummary?.plan);
+
+      renderMonthlyCharts(lastYearSim);
+  }
+
+  function printMonthlyModal() {
+    populateMonthlyOverview(); // ensure modal HTML exists
+
+    // Remove class only AFTER printing is finished
+    const cleanup = () => {
+      document.body.classList.remove("print-modal");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+
+    document.body.classList.add("print-modal");
+
+    // Give the browser 1 tick to apply styles before print snapshot
+    setTimeout(() => window.print(), 0);
   }
 
   function renderMonthlyCharts(yearSim) {
@@ -683,17 +1174,31 @@
       data: {
         labels,
         datasets: [
-          { label: "Forbrug (kWh)", data: m.load_kwh, stack: "kwh" },
-          { label: "Solpanel (kWh)", data: m.pv_kwh, stack: "kwh" },
-          { label: "Import (kWh)", data: m.import_kwh, stack: "kwh2" },
-          { label: "Eksport (kWh)", data: m.export_kwh, stack: "kwh2" },
+          { label: "Forbrug", data: m.load_kwh, backgroundColor: "rgba(212,232,193,0.85)" },
+          { label: "Solpanel", data: m.pv_kwh, backgroundColor: "rgba(141,184,124,0.85)" },
+          { label: "Import", data: m.import_kwh, backgroundColor: "rgba(245,215,105,0.9)" },
+          { label: "Eksport", data: m.export_kwh, backgroundColor: "rgba(237,138,63,0.9)" }
         ]
       },
       options: {
         responsive: true,
         scales: {
-          x: { stacked: true },
-          y: { stacked: true }
+          x: {
+            grid: { display: false }
+          },
+          y: {
+            title: {
+              display: true,
+              text: "kWh",
+              font: {
+                weight: "bold",
+                size: 13
+              }
+            },
+            grid: {
+              color: "#eee"
+            }
+          }
         }
       }
     });
@@ -704,19 +1209,34 @@
       data: {
         labels,
         datasets: [
-          { label: "Årlige elomkostninger uden solceller (DKK)", data: m.baseline_cost_dkk },
-          { label: "Årlige elomkostninger med solceller (DKK)", data: m.system_cost_dkk },
-          { label: "Besparelser (DKK)", data: m.savings_dkk }
+          { label: "Uden solceller", data: m.baseline_cost_dkk, backgroundColor: "rgba(212,232,193,0.85)" },
+          { label: "Med solceller", data: m.system_cost_dkk, backgroundColor: "rgba(141,184,124,0.85)" },
+          { label: "Besparelse", data: m.savings_dkk, backgroundColor: "rgba(237,138,63,0.9)" }
         ]
       },
       options: {
         responsive: true,
         scales: {
-          x: { stacked: false },
-          y: { stacked: false }
+          x: {
+            grid: { display: false }
+          },
+          y: {
+            title: {
+              display: true,
+              text: "DKK",
+              font: {
+                weight: "bold",
+                size: 13
+              }
+            },
+            grid: {
+              color: "#eee"
+            }
+          }
         }
       }
     });
+
   }
 
   function renderSimulationYear(data) {
@@ -775,6 +1295,85 @@
           </details>
         </div>
       </details>
+    `;
+  }
+
+  function fmtNum(x, digits = 2) {
+    if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
+    return Number(x).toFixed(digits);
+  }
+
+  function fmtPct(x) {
+    if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
+    return (Number(x) * 100).toFixed(1) + " %";
+  }
+
+  function buildPvDocHtml(summaryData) {
+    if (!summaryData) {
+      return `<div class="docTitle">Solpanel Resultater</div><div class="small">Ingen data endnu – tryk “Opdater oversigt”.</div>`;
+    }
+
+    const s = summaryData.inputs || {};
+    const yearKwh = Math.round(summaryData.energy_year_kwh_tmy ?? 0);
+    const peakPoa = Math.round(summaryData.peak_poa_wm2 ?? 0);
+    const peakPower = Math.round(summaryData.peak_power_w ?? 0);
+
+    return `
+      <div class="docTitle">Solpanel Resultater</div>
+      <div class="docMeta">
+        kWp=${fmtNum(s.kwp, 2)}, PR=${fmtNum(s.pr, 2)}, tilt=${fmtNum(s.tilt, 0)}°, az=${fmtNum(s.az, 0)}°
+      </div>
+
+      <div class="kvDoc">
+        <div class="k">Årlig produktion (TMY/PVGIS)</div>
+        <div class="v"><b>${yearKwh} kWh/år</b></div>
+
+        <div class="k">Peak POA</div>
+        <div class="v">${peakPoa} W/m²</div>
+
+        <div class="k">Peak PV effekt</div>
+        <div class="v">${peakPower} W</div>
+
+        <div class="k">Lokation</div>
+        <div class="v">${summaryData.location ? `${summaryData.location.lat.toFixed(5)}, ${summaryData.location.lon.toFixed(5)}` : "—"}</div>
+      </div>
+    `;
+  }
+
+  function buildYearSimDocHtml(yearSimData) {
+    if (!yearSimData || !yearSimData.summary) {
+      return `<div class="docTitle">Årlig Simulation</div><div class="small">Ingen data endnu – tryk “Opdater oversigt”.</div>`;
+    }
+
+    const s = yearSimData.summary;
+    const year = yearSimData.inputs?.year ?? "—";
+
+    return `
+      <div class="docTitle">Årlig Simulation (Estimat) ${year}</div>
+      <div class="docMeta">Omkostninger inkluderer spot + tariffer (jf. valgt pris-scenarie).</div>
+
+      <div class="kvDoc">
+        <div class="k">Basisomkostninger (uden solpanel)</div>
+        <div class="v">${fmtNum(s.baseline_cost_dkk)} DKK</div>
+
+        <div class="k">Omkostninger med solpanel</div>
+        <div class="v">${fmtNum(s.system_cost_dkk)} DKK</div>
+
+        <div class="k">Besparelser</div>
+        <div class="v"><b>${fmtNum(s.savings_dkk)} DKK</b></div>
+
+        <div class="k">Forbrug</div>
+        <div class="v">${fmtNum(s.load_kwh)} kWh</div>
+
+        <div class="k">Solpanel produktion</div>
+        <div class="v">${fmtNum(s.pv_kwh)} kWh</div>
+
+        <div class="k">Selvforbrug</div>
+        <div class="v">${fmtPct(s.self_consumption_ratio)}</div>
+
+        <div class="k">Selvforsyningsgrad</div>
+        <div class="v">${fmtPct(s.self_sufficiency)}</div>
+      </div>
     `;
   }
 
@@ -840,7 +1439,7 @@
             <div class="body">
               <div class="row2">
                 <div class="k">Årlig total (TMY/PVGIS)</div>
-                <div class="v">${yearKwh} kWh (year ${escapeHtml(String(data.year))})</div>
+                <div class="v">${yearKwh} kWh (år ${getDisplayYear()})</div>
               </div>
             </div>
           </details>
@@ -1023,17 +1622,10 @@
     `;
   }
 
-  function renderPlans(plans) {
-    if (!plansEl) return;
-
+  function buildPlansHtml(plans) {
     const standardPlan = buildStandardPlan();
 
-    // Always render ONE combined "Plans" section containing:
-    // 1) Standard info (always shown)
-    // 2) Lokalplan hits (if any)
-    const parts = [];
-
-    parts.push(`
+    return `
       <details class="section" open>
         <summary>
           Planer og vejledning
@@ -1044,10 +1636,109 @@
           ${renderFoundPlans(plans)}
         </div>
       </details>
-    `);
-
-    plansEl.innerHTML = parts.join("");
+    `;
   }
+
+  function renderPlans(plans) {
+    if (!plansEl) return;
+    plansEl.innerHTML = buildPlansHtml(plans);
+  }
+
+  function buildStandardPlanDocHtml(std) {
+    if (!std) return `<div class="docSectionTitle">Standard vejledning</div><div class="small">Ingen standarddata.</div>`;
+
+    const links = (std.links || []).map(l => `
+      <div class="detailRow">
+        <div class="detailLabel">${escapeHtml(l.label)}</div>
+        <div class="detailValue">
+          <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.linkText)}</a>
+          ${l.desc ? `<div class="small" style="margin-top:4px;">${escapeHtml(l.desc)}</div>` : ""}
+        </div>
+      </div>
+    `).join("");
+
+    const hints = (std.hints || []).map(h => `<li>${escapeHtml(h)}</li>`).join("");
+
+    return `
+      <div class="docSectionTitle">Standard vejledning</div>
+      <div class="small" style="margin-bottom:10px;">${escapeHtml(std.intro || "")}</div>
+
+      <div class="detailSection" style="background:#fff;">
+        <div class="detailTitle">Nyttige links</div>
+        <div class="detailBody">${links}</div>
+      </div>
+
+      ${hints ? `
+        <div class="detailSection" style="background:#fff;">
+          <div class="detailTitle">Hvis der ikke findes en lokalplan ved punktet</div>
+          <ul class="docList small">${hints}</ul>
+        </div>
+      ` : ""}
+    `;
+  }
+
+  function buildFoundPlansDocHtml(plans) {
+    if (!plans || !Array.isArray(plans) || plans.length === 0) {
+      return `
+        <div class="docSectionTitle">Lokalplaner på lokation</div>
+        <div class="small">Ingen lokalplaner fundet for det valgte punkt.</div>
+      `;
+    }
+
+    const items = plans.map((p, idx) => {
+      const name = p.plannavn || p.plan_navn || p.navn || `Plan ${idx + 1}`;
+      const id = p.planid ? String(p.planid) : "";
+      const type = p.plantype || p.plan_type || "";
+      const status = p.status || "";
+
+      // Collect links (any field that looks like a URL)
+      const urlFields = Object.entries(p)
+        .filter(([k, v]) => typeof v === "string" && (v.startsWith("http://") || v.startsWith("https://")))
+        .map(([k, v]) => `
+          <div class="detailRow">
+            <div class="detailLabel">${escapeHtml(niceLabel(k))}</div>
+            <div class="detailValue">
+              <a href="${escapeAttr(v)}" target="_blank" rel="noopener noreferrer">Åbn</a>
+            </div>
+          </div>
+        `).join("");
+
+      // Reuse your existing detailed rendering (already “same info”)
+      const detailsHtml = p.details ? renderDetails(p.details) : "";
+
+      return `
+        <div class="planDocItem">
+          <div class="planDocName">${escapeHtml(name)}${id ? ` <span class="pill">ID: ${escapeHtml(id)}</span>` : ""}</div>
+
+          <div class="planDocMeta">
+            ${type ? `Type: ${escapeHtml(type)} ` : ""}
+            ${status ? `• Status: ${escapeHtml(status)}` : ""}
+          </div>
+
+          ${urlFields ? `
+            <div class="detailSection" style="background:#fff;">
+              <div class="detailTitle">Links</div>
+              <div class="detailBody">${urlFields}</div>
+            </div>
+          ` : ""}
+
+          ${detailsHtml ? `
+            <div class="detailSection" style="background:#fff;">
+              <div class="detailTitle">Relevante uddrag</div>
+              <div class="detailBody">${detailsHtml}</div>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="docSectionTitle">Lokalplaner på lokation</div>
+      <div class="small">Fundet: <b>${plans.length}</b> plan(er)</div>
+      ${items}
+    `;
+  }
+
 
   function renderFoundPlans(plans) {
     if (!plans || !Array.isArray(plans) || plans.length === 0) {
@@ -1416,6 +2107,43 @@
       azBtn.classList.toggle("active", enabled);
     });
 
+    const tooltip = document.createElement("div");
+    tooltip.style.position = "fixed";
+    tooltip.style.zIndex = "999999";
+    tooltip.style.background = "#111";
+    tooltip.style.color = "#fff";
+    tooltip.style.padding = "10px 12px";
+    tooltip.style.borderRadius = "10px";
+    tooltip.style.fontSize = "12px";
+    tooltip.style.lineHeight = "1.4";
+    tooltip.style.maxWidth = "320px";
+    tooltip.style.whiteSpace = "pre-line";
+    tooltip.style.pointerEvents = "none";
+    tooltip.style.display = "none";
+
+    document.body.appendChild(tooltip);
+
+    document.addEventListener("mouseover", e => {
+      if (e.target.classList.contains("qm")) {
+        tooltip.textContent = e.target.getAttribute("data-tip");
+        tooltip.style.display = "block";
+      }
+    });
+
+    document.addEventListener("mousemove", e => {
+      if (tooltip.style.display === "block") {
+        tooltip.style.left = (e.clientX + 15) + "px";
+        tooltip.style.top = (e.clientY + 15) + "px";
+      }
+    });
+
+    document.addEventListener("mouseout", e => {
+      if (e.target.classList.contains("qm")) {
+        tooltip.style.display = "none";
+      }
+    });
+
+
     const AzControl = L.Control.extend({
       onAdd: function() {
         const btn = L.DomUtil.create("button");
@@ -1540,6 +2268,43 @@
     // Add swatches once (must happen AFTER control is added)
     setTimeout(() => applyLayerSwatches(layerControl, styleByDisplayName), 0);
 
+    // ===== Guide modal helpers =====
+    function openGuideModal() {
+      document.getElementById("guideModal").style.display = "flex";
+    }
+    function closeGuideModal() {
+      document.getElementById("guideModal").style.display = "none";
+    }
+
+    // Open guide
+    document.getElementById("btnGuide").onclick = () => {
+      openGuideModal();
+      statusEl.textContent = "Brugervejledning åbnet.";
+    };
+
+    // Close guide
+    document.getElementById("btnGuideClose").onclick = closeGuideModal;
+
+    // Click outside closes
+    document.getElementById("guideModal").onclick = (e) => {
+      if (e.target.id === "guideModal") closeGuideModal();
+    };
+
+    // Print guide
+    document.getElementById("btnGuidePrint").onclick = () => {
+      openGuideModal();
+
+      const cleanup = () => {
+        document.body.classList.remove("print-guide");
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+
+      document.body.classList.add("print-guide");
+      setTimeout(() => window.print(), 0);
+    };
+
+
     // Buttons
     document.getElementById("btnSummary").onclick = async () => {
       if (!selected) {
@@ -1620,6 +2385,12 @@
       // Modal close button
     document.getElementById("btnMonthlyClose").onclick = closeMonthlyModal;
 
+    document.getElementById("btnMonthlyPrint").onclick = () => {
+      // ensure charts exist in the modal before printing
+      try { renderMonthlyCharts(lastYearSim); } catch (e) {}
+      printMonthlyModal();
+    };
+
     // Click outside card closes modal
     document.getElementById("monthlyModal").onclick = (e) => {
       if (e.target.id === "monthlyModal") closeMonthlyModal();
@@ -1628,9 +2399,20 @@
     // Monthly overview button
     document.getElementById("btnMonthly").onclick = () => {
       try {
+        // Charts
         renderMonthlyCharts(lastYearSim);
+
+        // NEW: document-style blocks
+        document.getElementById("overviewLeft").innerHTML  = buildPvDocHtml(lastSummary);
+        document.getElementById("overviewRight").innerHTML = buildYearSimDocHtml(lastYearSim);
+
+        // NEW: plans in modal (standard + found)
+        const std = buildStandardPlan();
+        document.getElementById("overviewPlansLeft").innerHTML  = buildStandardPlanDocHtml(std);
+        document.getElementById("overviewPlansRight").innerHTML = buildFoundPlansDocHtml(lastSummary?.plan);
+
         openMonthlyModal();
-        statusEl.textContent = "Månedlig oversigt åbnet.";
+        statusEl.textContent = "Samlet oversigt åbnet.";
       } catch (err) {
         statusEl.textContent = String(err);
         console.error(err);

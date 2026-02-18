@@ -28,13 +28,6 @@ import bevaringskode
 TZ = "Europe/Copenhagen"
 ALTITUDE_M = 50
 
-PANEL_PRESETS = {
-    "1 kWp": 1.0,
-    "2 kWp": 2.0,
-    "5 kWp": 5.0,
-    "Custom": 1.0,
-}
-
 BASE_ANNUAL_KWH = 4200.0
 
 LAYERS_DIR = Path(__file__).resolve().parent / "layers"

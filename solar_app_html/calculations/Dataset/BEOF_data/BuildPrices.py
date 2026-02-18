@@ -1,4 +1,4 @@
-#%%
+#%% BuildPrices
 from __future__ import annotations
 
 import json
@@ -37,7 +37,7 @@ OUT_CSV = "DK2_2025_hourly_for_program.csv"
 # JS-style “Nordpool” transformation (from your JS)
 
 VAT_FACTOR = 1.25
-FIXED_ADDON_DKK_PER_KWH = 0.0625  # <-- use this if you want “spot incl moms + addon” like original JS
+FIXED_ADDON_DKK_PER_KWH = 0.0625  #  “spot incl moms + addon” like original JS
 
 
 # BEOF sell payout deductions (øre/kWh) -> total 8.82 øre/kWh

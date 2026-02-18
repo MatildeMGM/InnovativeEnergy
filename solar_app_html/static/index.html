@@ -731,6 +731,15 @@
       margin-top: 6px;
     }
 
+    #overviewBevaringskodeBox{
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      margin: 8px 0;
+    }
+
     /* ===== Fix Leaflet layers control being affected by global form styles ===== */
     .leaflet-control-layers input,
     .leaflet-control-layers select {
@@ -823,6 +832,12 @@
             Udsnittet viser området omkring den valgte markør.
           </div>
           <div id="miniMap"></div>
+        </div>
+
+        <!-- Bevaringskategori in overview -->
+        <div id="overviewBevaringskodeBox" class="miniMapWrap" style="margin-top:12px;">
+          <div class="miniMapTitle">Bevaringskategori</div>
+          <div id="overviewBevaringskodeContent" class="small">—</div>
         </div>
 
         <!-- 2 columns below -->
@@ -945,27 +960,27 @@
             <h2 class="docTitle">Screenshots / Eksempler</h2>
             <div class="guideImgGrid">
               <figure class="guideFigure">
-                <img class="guideImg" src="/static/screenshots/Location_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <img class="guideImg" src="/static/screenshots/Location_Input.png" alt="Billede kunne ikke indlæse, prøv at trykke F5 for at genindlæse siden" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: vælg punkt på kortet.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <img class="guideImg" src="/static/screenshots/Azimuth_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
-                <figcaption class="small">Eksempel: Vælg Azimuth.</figcaption>
-              </figure>
-
-              <figure class="guideFigure">
-                <img class="guideImg" src="/static/screenshots/Settings_Input.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <img class="guideImg" src="/static/screenshots/Settings_Input.png" alt="Billede kunne ikke indlæse, prøv at trykke F5 for at genindlæse siden" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: udfyld kWh/år og kWp.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <img class="guideImg" src="/static/screenshots/Output_Grafer.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <img class="guideImg" src="/static/screenshots/Azimuth_Input.png" alt="Billede kunne ikke indlæse, prøv at trykke F5 for at genindlæse siden" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <figcaption class="small">Eksempel: Vælg Azimuth.</figcaption>
+              </figure>
+
+              <figure class="guideFigure">
+                <img class="guideImg" src="/static/screenshots/Output_Grafer.png" alt="Billede kunne ikke indlæse, prøv at trykke F5 for at genindlæse siden" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: læs kWh- og DKK-grafer.</figcaption>
               </figure>
 
               <figure class="guideFigure">
-                <img class="guideImg" src="/static/screenshots/Output_Planer.png" alt="Vælg lokation" style="width:100%; border-radius:10px; border:1px solid #ddd;">
+                <img class="guideImg" src="/static/screenshots/Output_Planer.png" alt="Billede kunne ikke indlæse, prøv at trykke F5 for at genindlæse siden" style="width:100%; border-radius:10px; border:1px solid #ddd;">
                 <figcaption class="small">Eksempel: links og relevante uddrag.</figcaption>
               </figure>
             </div>
@@ -1001,6 +1016,9 @@
             <span class="qm" data-tip="Installeret effekt af solcelleanlægget. 1 kWp svarer typisk til ca. 3–4 paneler afhængigt af paneltype.">?</span>
           </label>
           <input id="kwp" type="number" step="0.1" value="1.0" min="0">
+          <div id="pvAreaEstimate" class="small" style="margin-top:6px; color:#555;">
+            Estimeret panelareal: —
+          </div>
           <div class="hr"></div>
         </div>
 
@@ -1163,40 +1181,39 @@
     </button>
 
     <div class="hr"></div>
-    <h2>Resultater</h2>
-    <div class="small"><b>Status:</b> <span id="status">Klik på kort for at vælge lokation. Tryk derefter på Opdater oversigt.</span></div>
-    <div class="small"><b>Valgt koordinat:</b> <span id="coord">—</span></div>
 
-    <div id="summary"></div>
-    <div class="hr"></div>
-    <div id="simulationYear"></div>
+    <div class="small">
+      <b>Status:</b>
+      <span id="status">Klik på kort for at vælge lokation. Tryk derefter på Opdater oversigt.</span>
+    </div>
 
-    <div class="hr"></div>
-    <h4 style="margin: 8px 0;">Lokalplaner</h4>
-    <div id="bevaringskodeBox">Bevaringskategori:</div>
-    <div id="plans"></div>
+    <div class="small">
+      <b>Valgt koordinat:</b>
+      <span id="coord">—</span>
+    </div>
+
   </div>
 
   <div id="map"></div>
 </div>
 
 <script>
-  const summaryEl = document.getElementById("summary");
-  const plansEl = document.getElementById("plans");
-  const coord = document.getElementById("coord");
-  const statusEl = document.getElementById("status");
-
   const kwpEl = document.getElementById("kwp");
   const prEl = document.getElementById("pr");
   const tiltEl = document.getElementById("tilt");
   const azEl = document.getElementById("az");
   const annualKwhEl = document.getElementById("annual_kwh");
+  const coord = document.getElementById("coord");
+  const statusEl = document.getElementById("status");
 
-  const bevaringskodeEl = document.getElementById("bevaringskodeBox");
+  // sidebar outputs removed:
+  const summaryEl = null;
+  const plansEl = null;
+  const bevaringskodeEl = null;
+  const simYearEl = null;
 
     //Simulering Solpanel
   const simBox = document.getElementById("simBox");
-  const simYearEl = document.getElementById("simulationYear");
 
     //Simulering med Batteri
   const battKwhEl = document.getElementById("batt_kwh");
@@ -1339,7 +1356,7 @@
 
     // Use OSM tiles for the mini map
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19
+      maxZoom: 20
     }).addTo(miniMap);
 
     miniMarker = L.marker([0, 0], { interactive: false }).addTo(miniMap);
@@ -1373,7 +1390,7 @@
       }).setView(center, z);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19
+        maxZoom: 20
       }).addTo(miniMap);
 
       miniMarker = L.marker(center, { interactive:false }).addTo(miniMap);
@@ -1636,6 +1653,37 @@
     return (Number(x) * 100).toFixed(1) + " %";
   }
 
+  function updatePvAreaEstimate(){
+    const out = document.getElementById("pvAreaEstimate");
+    if (!out) return;
+
+    const kwp = Number(kwpEl?.value);
+    if (!Number.isFinite(kwp) || kwp <= 0){
+      out.innerHTML = "Estimeret panelareal: —";
+      return;
+    }
+
+    // Assumptions
+    const panelWpMin = 400;   // Wp
+    const panelWpMax = 500;   // Wp
+    const panelAreaMin = 1.7; // m² (compact 400–500Wp module)
+    const panelAreaMax = 2.1; // m² (larger modern module)
+
+    // Panel count range
+    const nMin = (kwp * 1000) / panelWpMax; // fewer panels when higher Wp
+    const nMax = (kwp * 1000) / panelWpMin; // more panels when lower Wp
+
+    // Area range (min area uses fewer panels + smaller area; max uses more panels + larger area)
+    const areaMin = nMin * panelAreaMin;
+    const areaMax = nMax * panelAreaMax;
+
+    const a1 = Math.round(areaMin);
+    const a2 = Math.round(areaMax);
+
+    out.innerHTML = `Estimeret panelareal: <b>${a1}–${a2} m²</b> <span class="small">(ca. 400–500 Wp paneler)</span>`;
+  }
+
+
   function buildPvDocHtml(summaryData) {
     if (!summaryData) {
       return `<div class="docTitle">Solpanel Resultater</div><div class="small">Ingen data endnu – tryk “Opdater oversigt”.</div>`;
@@ -1645,6 +1693,26 @@
     const yearKwh = Math.round(summaryData.energy_year_kwh_tmy ?? 0);
     const peakPoa = Math.round(summaryData.peak_poa_wm2 ?? 0);
     const peakPower = Math.round(summaryData.peak_power_w ?? 0);
+
+    // ===== NEW: area estimate =====
+    const kwp = Number(s.kwp ?? 0);
+
+    let areaHtml = "—";
+    if (kwp > 0) {
+      const panelWpMin = 400;
+      const panelWpMax = 500;
+      const panelAreaMin = 1.7;
+      const panelAreaMax = 2.1;
+
+      const nMin = (kwp * 1000) / panelWpMax;
+      const nMax = (kwp * 1000) / panelWpMin;
+
+      const areaMin = Math.round(nMin * panelAreaMin);
+      const areaMax = Math.round(nMax * panelAreaMax);
+
+      areaHtml = `${areaMin}–${areaMax} m²`;
+    }
+    // ==============================
 
     return `
       <div class="docTitle">Solpanel Resultater</div>
@@ -1656,6 +1724,9 @@
         <div class="k">Årlig produktion (TMY/PVGIS)</div>
         <div class="v"><b>${yearKwh} kWh/år</b></div>
 
+        <div class="k">Estimeret panelareal</div>
+        <div class="v">${areaHtml} <span class="small">(ca. 400–500 Wp paneler)</span></div>
+
         <div class="k">Peak POA</div>
         <div class="v">${peakPoa} W/m²</div>
 
@@ -1663,10 +1734,15 @@
         <div class="v">${peakPower} W</div>
 
         <div class="k">Lokation</div>
-        <div class="v">${summaryData.location ? `${summaryData.location.lat.toFixed(5)}, ${summaryData.location.lon.toFixed(5)}` : "—"}</div>
+        <div class="v">
+          ${summaryData.location
+            ? `${summaryData.location.lat.toFixed(5)}, ${summaryData.location.lon.toFixed(5)}`
+            : "—"}
+        </div>
       </div>
     `;
   }
+
 
   function buildYearSimDocHtml(yearSimData) {
     if (!yearSimData || !yearSimData.summary) {
@@ -1935,18 +2011,30 @@
   function renderBevaringskode(data) {
     const code = data?.bevaringskode ?? null;
 
-    if (code === null || code === undefined || String(code).trim() === "") {
-      bevaringskodeEl.innerHTML = `
-        <div><b>Bevaringskategori:</b> —</div>
-        <div class="small">Ingen Bevaringskategori fundet for pågældende lokation (kontroller om markør står hvor husnummeret er vist).</div>
-      `;
-      return;
-    }
+    const htmlNo = `
+      <div><b>Bevaringskategori:</b> —</div>
+      <div class="small">Ingen Bevaringskategori fundet for pågældende lokation (kontroller om markør står hvor husnummeret er vist).</div>
+    `;
 
-    bevaringskodeEl.innerHTML = `
+    const htmlYes = `
       <div><b>Bevaringskategori:</b> <span class="pill">${escapeHtml(String(code))}</span></div>
       <div class="small">Indikerer at bygningen har en gældende Bevaringskategori, kontroller gældende lovgivning for kategori.</div>
     `;
+
+    const html = (code === null || code === undefined || String(code).trim() === "")
+      ? htmlNo
+      : htmlYes;
+
+    // Sidebar box (existing)
+    if (bevaringskodeEl) {
+      bevaringskodeEl.innerHTML = html;
+    }
+
+    // Overview modal box (new)
+    const overviewBox = document.getElementById("overviewBevaringskodeContent");
+    if (overviewBox) {
+      overviewBox.innerHTML = html;
+    }
   }
 
   function buildPlansHtml(plans) {
@@ -2421,8 +2509,9 @@
   async function init() {
     const extraOverlays = {}; // name -> Leaflet layer
     const center = await getJSON("/api/center");
-    plansEl.innerHTML = "<div class='small'>Tryk “Opdater oversigt” for at se planer og vejledning.</div>";
-    // Map
+    if (plansEl) {
+      plansEl.innerHTML = "<div class='small'>Tryk “Opdater oversigt” for at se planer og vejledning.</div>";
+    }    // Map
     const map = L.map("map").setView([center.lat, center.lon], 10);
 
     // ===== Azimuth tool =====
@@ -2498,7 +2587,7 @@
       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
         minZoom: 10,
-        maxZoom: 19,
+        maxZoom: 20,
         attribution: "&copy; OpenStreetMap contributors"
       }
     );
@@ -2508,7 +2597,7 @@
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
         minZoom: 10,
-        maxZoom: 19,
+        maxZoom: 20,
         attribution: "Tiles © Esri"
       }
     );
@@ -2657,16 +2746,15 @@
       addBatteryParams(params);
 
       // Optional: progress text
-      if (simYearEl) simYearEl.innerHTML = "<div class='small'>Running yearly simulation…</div>";
-
       try {
         // Bevaringskode (non-fatal if it fails)
         try {
-          bevaringskodeEl.innerHTML = "<div class='small'>Looking up Bevaringskode…</div>";
           const bk = await getJSON(`/api/bevaringskode?lat=${selected.lat}&lon=${selected.lon}`);
           renderBevaringskode(bk);
         } catch (e) {
-          bevaringskodeEl.innerHTML = "<div class='small'>Bevaringskode lookup failed.</div>";
+          // optional: show something in the overview box
+          const overviewBox = document.getElementById("overviewBevaringskodeContent");
+          if (overviewBox) overviewBox.innerHTML = "<div class='small'>Bevaringskode lookup failed.</div>";
         }
         // 1) PV summary
         const summary = await getJSON(`/api/summary?${params.toString()}`);
@@ -2696,9 +2784,7 @@
         lastComputedScenario = priceScenarioEl.value;
         lastComputedYear = getDisplayYear(); // or scenarioToYear(lastComputedScenario) if you use that helper
 
-        // Render after computed markers are set
-        renderSummary(lastSummary);
-        renderSimulationYear(lastYearSim);
+
 
         // Make sure labels/buttons match the *UI year* you want to show
         refreshYearLabels();
@@ -2716,9 +2802,6 @@
 
         if (typeof simEl !== "undefined" && simEl) {
           simEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
-        }
-        if (typeof simYearEl !== "undefined" && simYearEl) {
-          simYearEl.innerHTML = "<pre class='small'>Fejl:\n" + escapeHtml(String(err)) + "</pre>";
         }
       } finally {
         setUpdateLoading(false);
@@ -2800,13 +2883,8 @@
     };
 
   priceScenarioEl.addEventListener("change", () => {
-    // Do NOT change year labels to the new year yet.
-    // Instead, re-render sections so they can show "Ikke opdateret" if stale.
-    if (lastSummary) renderSummary(lastSummary);
-    if (lastYearSim) renderSimulationYear(lastYearSim);
-
-    // Optional: also lock the monthly button title/text to computed year
-    refreshYearLabels(); // but make refreshYearLabels use getUiYear() (next section)
+    // Sidebar outputs removed. Keep only label refresh if you still want it.
+    refreshYearLabels();
   });
 
     refreshYearLabels();
@@ -2830,11 +2908,13 @@
     return lastComputedScenario && priceScenarioEl?.value !== lastComputedScenario;
   }
 
+  updatePvAreaEstimate();
+  kwpEl.addEventListener("input", updatePvAreaEstimate);
+
   setMonthlyEnabled(false);
 
   init().catch(err => {
-    summaryEl.textContent = "Init error:\n" + err;
-    statusEl.textContent = "Fejl under initialisering. Se detaljer i output.";
+    statusEl.textContent = "Fejl under initialisering. Se console (F12).";
     console.error(err);
   });
 </script>

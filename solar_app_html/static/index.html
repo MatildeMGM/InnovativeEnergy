@@ -508,12 +508,37 @@
       }
     }
 
+    /* Make Chart.js canvases always have a real height */
+    #chartMonthlyEnergy,
+    #chartMonthlyCost {
+      width: 100% !important;
+      height: 260px !important; /* adjust if you want taller/shorter */
+    }
+
+    /* In print, FORCE charts to stay side-by-side */
+    @media print {
+      body.print-modal .modalGrid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+      }
+
+      /* keep the canvases height in print too */
+      body.print-modal #chartMonthlyEnergy,
+      body.print-modal #chartMonthlyCost {
+        height: 260px !important;
+      }
+    }
 
     /* ===== Modal document layout ===== */
     .overviewDoc{
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
+    }
+
+    /* Force overviewDoc to stack (econ first, PV after) */
+    .overviewDoc.stack {
+      grid-template-columns: 1fr;
     }
 
     /* Nice “document card” look */
@@ -678,6 +703,33 @@
       }
     }
 
+    /* ===== Mini map inside “Samlet oversigt” ===== */
+    .miniMapWrap{
+      margin: 10px 0 12px 0;
+      padding: 10px;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      background: #fafafa;
+    }
+
+    .miniMapTitle{
+      font-weight: 800;
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: #111;
+    }
+
+    #miniMap{
+      width: 100%;
+      height: 220px;            /* <- change this to resize */
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      overflow: hidden;
+    }
+
+    .miniMapNote{
+      margin-top: 6px;
+    }
 
     /* ===== Fix Leaflet layers control being affected by global form styles ===== */
     .leaflet-control-layers input,
@@ -764,7 +816,16 @@
 
       <div class="modalBody">
 
-        <!-- NEW: document-style top (2 columns) -->
+        <!-- NEW: mini map first (full width) -->
+        <div id="overviewTop" class="docCard" style="margin-bottom:12px;">
+          <div class="docTitle">Kortudsnit af valgt lokation</div>
+          <div class="small" style="margin-bottom:8px;">
+            Udsnittet viser området omkring den valgte markør.
+          </div>
+          <div id="miniMap"></div>
+        </div>
+
+        <!-- 2 columns below -->
         <div id="overviewDoc" class="overviewDoc">
           <div id="overviewLeft" class="docCard"></div>
           <div id="overviewRight" class="docCard"></div>
@@ -775,11 +836,13 @@
           <div class="modalPanel">
             <div class="small"><b>Estimeret El-Energi balance (kWh)</b></div>
             <canvas id="chartMonthlyEnergy"></canvas>
+            <img id="printChartMonthlyEnergy" style="display:none; width:100%; height:auto;" alt="Chart energy">
           </div>
 
           <div class="modalPanel">
             <div class="small"><b>Estimerede omkostninger og besparelser (DKK)</b></div>
             <canvas id="chartMonthlyCost"></canvas>
+            <img id="printChartMonthlyCost" style="display:none; width:100%; height:auto;" alt="Chart cost">
           </div>
         </div>
 
@@ -1100,7 +1163,7 @@
     </button>
 
     <div class="hr"></div>
-    <h1>Outputs</h1>
+    <h2>Resultater</h2>
     <div class="small"><b>Status:</b> <span id="status">Klik på kort for at vælge lokation. Tryk derefter på Opdater oversigt.</span></div>
     <div class="small"><b>Valgt koordinat:</b> <span id="coord">—</span></div>
 
@@ -1160,6 +1223,9 @@
   let lastComputedYear = null;       // 2025 / 2026 (display year)
   let isCalculating = false;
 
+  let miniMap = null;
+  let miniMarker = null;
+  let miniCircle = null;
 
   let lastSummary = null;
 
@@ -1242,9 +1308,80 @@
 
   function openMonthlyModal() {
     document.getElementById("monthlyModal").style.display = "flex";
+
+    // Let DOM paint, then build/refresh minimap
+    requestAnimationFrame(() => {
+      updateMiniMap();
+    });
   }
+
   function closeMonthlyModal() {
     document.getElementById("monthlyModal").style.display = "none";
+  }
+
+  function ensureMiniMap() {
+    const el = document.getElementById("miniMap");
+    if (!el) return; // miniMap container not in DOM yet
+    if (miniMap) return;
+
+    // Create a “static screenshot-like” map (no interactions)
+    miniMap = L.map("miniMap", {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      tap: false,
+      touchZoom: false
+    });
+
+    // Use OSM tiles for the mini map
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(miniMap);
+
+    miniMarker = L.marker([0, 0], { interactive: false }).addTo(miniMap);
+
+    // Optional: a small radius ring around the point (looks “selection-ish”)
+    miniCircle = L.circle([0, 0], {
+      radius: 35, // meters
+      interactive: false
+    }).addTo(miniMap);
+  }
+
+  function updateMiniMap(){
+    const el = document.getElementById("miniMap");
+    if (!el) return;
+    if (!selected) return;
+
+    const center = [selected.lat, selected.lon];
+    const z = 18;
+
+    if (!miniMap){
+      miniMap = L.map(el, {
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        tap: false,
+        touchZoom: false
+      }).setView(center, z);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19
+      }).addTo(miniMap);
+
+      miniMarker = L.marker(center, { interactive:false }).addTo(miniMap);
+    } else {
+      miniMap.setView(center, z, { animate: false });
+      if (miniMarker) miniMarker.setLatLng(center);
+      miniMap.invalidateSize();
+    }
   }
 
   function populateMonthlyOverview() {
@@ -1280,9 +1417,8 @@
         ${yearHtml}
       </div>
     `;
-      document.getElementById("overviewLeft").innerHTML  = buildPvDocHtml(lastSummary);
-      document.getElementById("overviewRight").innerHTML = buildYearSimDocHtml(lastYearSim);
-      document.getElementById("overviewPlans").innerHTML = buildPlansHtml(lastSummary?.plan);
+      document.getElementById("overviewLeft").innerHTML  = buildYearSimDocHtml(lastYearSim);
+      document.getElementById("overviewRight").innerHTML = buildPvDocHtml(lastSummary);
 
       const std = buildStandardPlan();
       document.getElementById("overviewPlansLeft").innerHTML  = buildStandardPlanDocHtml(std);
@@ -1305,6 +1441,37 @@
 
     // Give the browser 1 tick to apply styles before print snapshot
     setTimeout(() => window.print(), 0);
+  }
+
+  function swapChartsForPrint(enable){
+    const c1 = document.getElementById("chartMonthlyEnergy");
+    const c2 = document.getElementById("chartMonthlyCost");
+    const i1 = document.getElementById("printChartMonthlyEnergy");
+    const i2 = document.getElementById("printChartMonthlyCost");
+
+    if (!c1 || !c2 || !i1 || !i2) return;
+
+    if (enable){
+      // IMPORTANT: ensure canvases are visible during snapshot
+      c1.style.display = "block";
+      c2.style.display = "block";
+
+      // Snapshot
+      i1.src = c1.toDataURL("image/png", 1.0);
+      i2.src = c2.toDataURL("image/png", 1.0);
+
+      // Show images, hide canvases (print uses images)
+      c1.style.display = "none";
+      c2.style.display = "none";
+      i1.style.display = "block";
+      i2.style.display = "block";
+    } else {
+      // Restore interactive view
+      i1.style.display = "none";
+      i2.style.display = "none";
+      c1.style.display = "block";
+      c2.style.display = "block";
+    }
   }
 
   function renderMonthlyCharts(yearSim) {
@@ -1338,6 +1505,8 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
         scales: {
           x: {
             grid: { display: false }
@@ -1372,6 +1541,8 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
         scales: {
           x: {
             grid: { display: false }
@@ -1512,7 +1683,7 @@
 
     return `
       <div class="docTitle">Årlig Simulation (Estimat) ${displayYear}</div>
-      <div class="docMeta">Omkostninger inkluderer spot + tariffer (jf. valgt pris-scenarie).</div>
+      <div class="docMeta">Omkostninger inkluderer spot + tariffer (jf. valgt pris-scenarie). Omkostninger og besparelser er beregnet ud fra gennemsnitlige husstandsforbrug og kan derfor afvige fra dit forbrug</div>
 
       <div class="kvDoc">
         <div class="k">Basisomkostninger (uden solpanel)</div>
@@ -1538,6 +1709,7 @@
         
         ${staleNote}
       </div>
+      
     `;
   }
 
@@ -1550,6 +1722,7 @@
     if (marker) {
       marker.setLatLng([lat, lon]);
     }
+    if (miniMap) updateMiniMap();
   }
 
   function tip(text) {
@@ -2555,10 +2728,40 @@
       // Modal close button
     document.getElementById("btnMonthlyClose").onclick = closeMonthlyModal;
 
-    document.getElementById("btnMonthlyPrint").onclick = () => {
-      // ensure charts exist in the modal before printing
-      try { renderMonthlyCharts(lastYearSim); } catch (e) {}
-      printMonthlyModal();
+    document.getElementById("btnMonthlyPrint").onclick = async () => {
+      try {
+        // Ensure all modal content is filled
+        populateMonthlyOverview();
+        openMonthlyModal();
+
+        // Give layout time (important for Chart.js sizing)
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        // Draw charts when modal is visible and sized
+        renderMonthlyCharts(lastYearSim);
+
+        // Wait 2 frames so canvas is definitely painted
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        // Swap canvases to images for reliable printing
+        swapChartsForPrint(true);
+
+        const cleanup = () => {
+          swapChartsForPrint(false);
+          document.body.classList.remove("print-modal");
+          window.removeEventListener("afterprint", cleanup);
+        };
+        window.addEventListener("afterprint", cleanup);
+
+        document.body.classList.add("print-modal");
+
+        // Small delay so <img> src is applied before print snapshot
+        setTimeout(() => window.print(), 50);
+
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = "Print-fejl: " + String(e);
+      }
     };
 
     // Click outside card closes modal
@@ -2569,20 +2772,26 @@
     // Monthly overview button
     document.getElementById("btnMonthly").onclick = () => {
       if (btnMonthly.disabled) return;
+
       try {
-        // Charts
-        renderMonthlyCharts(lastYearSim);
+        // Fill doc cards
+        document.getElementById("overviewLeft").innerHTML  = buildYearSimDocHtml(lastYearSim);
+        document.getElementById("overviewRight").innerHTML = buildPvDocHtml(lastSummary);
 
-        // NEW: document-style blocks
-        document.getElementById("overviewLeft").innerHTML  = buildPvDocHtml(lastSummary);
-        document.getElementById("overviewRight").innerHTML = buildYearSimDocHtml(lastYearSim);
-
-        // NEW: plans in modal (standard + found)
+        // Fill plans
         const std = buildStandardPlan();
         document.getElementById("overviewPlansLeft").innerHTML  = buildStandardPlanDocHtml(std);
         document.getElementById("overviewPlansRight").innerHTML = buildFoundPlansDocHtml(lastSummary?.plan);
 
+        // Open modal first so canvases have real size
         openMonthlyModal();
+
+        // Now update minimap + charts after modal is visible
+        requestAnimationFrame(() => {
+          updateMiniMap();
+          renderMonthlyCharts(lastYearSim);
+        });
+
         statusEl.textContent = "Samlet oversigt åbnet.";
       } catch (err) {
         statusEl.textContent = String(err);

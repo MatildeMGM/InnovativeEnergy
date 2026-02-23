@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Energi Borhnolm</title>
+  <title>Energioverblik Bornholm</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -984,10 +984,6 @@
                 <figcaption class="small">Eksempel: links og relevante uddrag.</figcaption>
               </figure>
             </div>
-
-            <!-- Optional: real images later
-            <img class="guideImg" src="img/step1.png" alt="Step 1">
-            -->
           </div>
         </div>
       </div>
@@ -996,7 +992,7 @@
 
 
   <div id="side">
-    <h1>Inputs</h1> 
+    <h2>Energioverblik Bornholm</h2> 
     <details class="section" open>
       <summary>Indstillinger for anlæg</summary>
       <div class="body">
@@ -1601,7 +1597,7 @@
       <details class="section">
         <summary>
           Årlig simulation (${year} ${staleBadge})
-          <span class="badge">${fmt(s.savings_dkk)} DKK</span>
+          <span class="badge">${fmtNum(s.savings_dkk,0)} DKK</span>
         </summary>
         <div class="body">
           <details class="section" open>
@@ -1609,13 +1605,13 @@
             <div class="body">
               <div class="row2">
                 <div class="k">Årlige elomkostninger <b>uden</b> solceller</div>
-                <div class="v">${fmt(s.baseline_cost_dkk)} DKK</div>
+                <div class="v">${fmtNum(s.baseline_cost_dkk,0)} DKK</div>
 
                 <div class="k">Årlige elomkostninger <b>med</b> solceller</div>
-                <div class="v">${fmt(s.system_cost_dkk)} DKK</div>
+                <div class="v">${fmtNum(s.system_cost_dkk,0)} DKK</div>
 
                 <div class="k">Besparelser</div>
-                <div class="v"><b>${fmt(s.savings_dkk)} DKK</b></div>
+                <div class="v"><b>${fmtNum(s.savings_dkk,0)} DKK</b></div>
 
                 <div class="k">Forbrug</div>
                 <div class="v">${fmt(s.load_kwh)} kWh</div>
@@ -1643,7 +1639,7 @@
     `;
   }
 
-  function fmtNum(x, digits = 2) {
+  function fmtNum(x, digits = 0) {
     if (x === null || x === undefined || Number.isNaN(Number(x))) return "—";
     return Number(x).toFixed(digits);
   }
@@ -1763,13 +1759,13 @@
 
       <div class="kvDoc">
         <div class="k">Basisomkostninger (uden solpanel)</div>
-        <div class="v">${fmtNum(s.baseline_cost_dkk)} DKK</div>
+        <div class="v">${fmtNum(s.baseline_cost_dkk,0)} DKK</div>
 
         <div class="k">Omkostninger med solpanel</div>
-        <div class="v">${fmtNum(s.system_cost_dkk)} DKK</div>
+        <div class="v">${fmtNum(s.system_cost_dkk,0)} DKK</div>
 
         <div class="k">Besparelser</div>
-        <div class="v"><b>${fmtNum(s.savings_dkk)} DKK</b></div>
+        <div class="v"><b>${fmtNum(s.savings_dkk,0)} DKK</b></div>
 
         <div class="k">Forbrug</div>
         <div class="v">${fmtNum(s.load_kwh)} kWh</div>
@@ -2646,7 +2642,7 @@
       }
     }
 
-    // Optional: fit to the first default-enabled layer (if it exists)
+    // Optional: fit to the first default-enabled layer (if it exists) (LIMITED)
     if (boundsLayer && boundsLayer.getBounds && boundsLayer.getBounds().isValid()) {
       const b = boundsLayer.getBounds();
       map.fitBounds(b.pad(0.15));

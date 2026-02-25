@@ -1861,7 +1861,7 @@
     if (!root.querySelector(".layers-title")) {
       const title = document.createElement("div");
       title.className = "layers-title";
-      title.textContent = "Layers";
+      title.textContent = "Baggrundskort";
       root.insertBefore(title, root.firstChild);
     }
 
@@ -2671,8 +2671,8 @@
 
     // ----- Layer control (built from config-loaded overlays) -----
     const baseLayers = {
-      "OpenStreetMap": osm,
-      "Satellite (Esri)": esriSat
+      "Standard": osm,
+      "Satellitkort": esriSat
     };
 
     const layerControl = L.control.layers(baseLayers, overlays, { collapsed: false }).addTo(map);

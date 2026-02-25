@@ -46,7 +46,7 @@ PRICES_PATH = DATA_DIR / "DK2_2025_hourly_for_program.csv"
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-DETAILS_CSV_PATH = Path(__file__).resolve().parent / "theMASTERplan - Lokal_Plan.csv"
+DETAILS_CSV_PATH = Path(__file__).resolve().parent / "static/Lokal_Plan.csv"
 
 def _extract_planid_from_doklink(doklink: str) -> int | None:
     if not isinstance(doklink, str):

@@ -2657,7 +2657,7 @@
     .on('markgeocode', function(e) {
       const latlng = e.geocode.center;
 
-      setSelected(latlng.lat, latlng.lng);  // your existing function
+      setSelected(latlng.lat, latlng.lng); 
       map.setView(latlng, 15);
 
       if (marker) marker.setLatLng(latlng);
